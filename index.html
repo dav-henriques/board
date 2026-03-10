@@ -482,6 +482,22 @@
 </div>
 
 <script type="module">
+/* ── FIREBASE ── */
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getDatabase, ref, set, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+
+const _app = initializeApp({
+  apiKey: "AIzaSyA8DI8tyA_ZblKpj-UmMIq1PVYzkJ2aNzQ",
+  authDomain: "o-maquinario-do-fim.firebaseapp.com",
+  databaseURL: "https://o-maquinario-do-fim-default-rtdb.firebaseio.com",
+  projectId: "o-maquinario-do-fim",
+  storageBucket: "o-maquinario-do-fim.firebasestorage.app",
+  messagingSenderId: "190938684149",
+  appId: "1:190938684149:web:0f988af35ec4a5213f03bc"
+});
+const _db = getDatabase(_app);
+const BOARD_REF = ref(_db, 'board/notes');
+
 /* ── CLOCK ── */
 setInterval(()=>{
   const n=new Date();
@@ -564,22 +580,6 @@ const BL=[
     },500);
   },total);
 })();
-
-/* ── FIREBASE ── */
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getDatabase, ref, set, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-
-const _app = initializeApp({
-  apiKey: "AIzaSyA8DI8tyA_ZblKpj-UmMIq1PVYzkJ2aNzQ",
-  authDomain: "o-maquinario-do-fim.firebaseapp.com",
-  databaseURL: "https://o-maquinario-do-fim-default-rtdb.firebaseio.com",
-  projectId: "o-maquinario-do-fim",
-  storageBucket: "o-maquinario-do-fim.firebasestorage.app",
-  messagingSenderId: "190938684149",
-  appId: "1:190938684149:web:0f988af35ec4a5213f03bc"
-});
-const _db = getDatabase(_app);
-const BOARD_REF = ref(_db, 'board/notes');
 
 /* ── NOTES ── */
 let notes=[],zt=20,acp=null;

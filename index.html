@@ -270,7 +270,7 @@
       font-family: 'JetBrains Mono', monospace; cursor: text; min-width: 0;
       transition: text-shadow .15s;
     }
-    .n-tag:focus { color: var(--text); text-shadow: none; text-transform: none; letter-spacing: .04em; }
+    .n-tag:focus { color: color-mix(in srgb, var(--accent, var(--green)) 85%, white); text-shadow: none; text-transform: none; letter-spacing: .04em; }
 
     .n-acts { display: flex; gap: 2px; flex-shrink: 0; position: relative; }
 
@@ -288,10 +288,10 @@
 
     .n-ta {
       width: 100%; min-height: 80px; background: transparent; border: none; outline: none;
-      color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.6;
+      color: color-mix(in srgb, var(--accent, var(--green)) 80%, white); font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.6;
       resize: none; caret-color: var(--accent, var(--green)); cursor: text;
     }
-    .n-ta::placeholder { color: var(--muted); font-style: italic; }
+    .n-ta::placeholder { color: color-mix(in srgb, var(--accent, var(--green)) 25%, transparent); font-style: italic; }
     .n-ta.dn { display: none; }
 
     /* checklist */
@@ -320,11 +320,11 @@
 
     .clbl {
       flex: 1; outline: none; background: transparent; border: none;
-      color: var(--text); font-family: 'JetBrains Mono', monospace;
+      color: color-mix(in srgb, var(--accent, var(--green)) 80%, white); font-family: 'JetBrains Mono', monospace;
       font-size: 13px; line-height: 1.6; cursor: text; min-width: 0; word-break: break-word;
       transition: color .15s;
     }
-    .clbl.dn { color: var(--muted); text-decoration: line-through; }
+    .clbl.dn { color: color-mix(in srgb, var(--accent, var(--green)) 30%, transparent); text-decoration: line-through; }
 
     .acb {
       margin-top: 7px; background: transparent; border: none; color: var(--muted);

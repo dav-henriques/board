@@ -20,6 +20,7 @@ for d in (ASSETS, ICONS, SPLASH):
     os.makedirs(d, exist_ok=True)
 
 SOURCE   = os.path.join(ASSETS, "avatar.jpg")
+MARK_PNG = os.path.join(ASSETS, "mark.png")
 WORDMARK = "SUNN"
 TAGLINE  = "Belo Horizonte · MG"
 
@@ -58,7 +59,23 @@ def load_mark():
     do "S". Então o fundo é identificado por preenchimento a partir das
     bordas: o que é preto mas não se conecta à borda é miolo, e continua
     opaco. É o que faz o brilho contornar o sol em vez de vazar por dentro.
+
+    Se assets/mark.png já existe, ele manda: é a marca definitiva, já
+    recortada. Isso evita que um avatar.jpg desatualizado (ou de outra
+    versão do logo) sobrescreva a identidade do site sem querer. Trocou
+    de logo de verdade? Apague mark.png e rode de novo — aí o recorte
+    volta a sair de avatar.jpg.
     """
+    if os.path.exists(MARK_PNG):
+        cut = Image.open(MARK_PNG).convert("RGBA")
+        box = cut.getchannel("A").point(lambda v: 255 if v > 14 else 0).getbbox()
+        if box:
+            cut = cut.crop(box)
+        side = max(cut.size)
+        square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        square.paste(cut, ((side - cut.width) // 2, (side - cut.height) // 2))
+        return square
+
     src = Image.open(SOURCE).convert("RGB")
     lum = src.convert("L")
     alpha = lum.point(lambda v: min(255, int(v * 1.9)))
@@ -95,7 +112,10 @@ def accent_from(mark):
     ss = [0.0] * bins
     ls = [0.0] * bins
 
-    for r, g, b, a in small.getdata():
+    # lido em bytes crus: getdata() está a caminho da aposentadoria no Pillow
+    px = small.convert("RGBA").tobytes()
+    for i in range(0, len(px), 4):
+        r, g, b, a = px[i], px[i + 1], px[i + 2], px[i + 3]
         if a < 128:
             continue
         h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
@@ -128,6 +148,136 @@ def accent_from(mark):
 
 MARK   = load_mark()
 ACCENT = accent_from(MARK)
+
+
+# ────────────────────────────────────────────────────────────────
+# A MARCA EM DUAS CAMADAS — o sol gira, o "S" fica parado
+# ────────────────────────────────────────────────────────────────
+def _fill_holes(mask):
+    """Fecha os vazados de uma máscara 0/255. O lado de fora encosta na borda."""
+    inv = ImageChops.invert(mask)
+    w, h = mask.size
+    for corner in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+        if inv.getpixel(corner):
+            ImageDraw.floodfill(inv, corner, 0)
+    return ImageChops.lighter(mask, inv)
+
+
+def _centroid(mask):
+    """Centro de massa de uma máscara 0/255, contando linha a linha."""
+    w, h = mask.size
+    rows = mask.tobytes()
+    cols = mask.transpose(Image.TRANSPOSE).tobytes()
+    total = sy = sx = 0
+    for y in range(h):
+        n = rows[y * w:(y + 1) * w].count(255)
+        sy += n * y
+        total += n
+    for x in range(w):
+        sx += cols[x * h:(x + 1) * h].count(255) * x
+    return (sx / total, sy / total) if total else (w / 2, h / 2)
+
+
+def _max_radius(mask, cx, cy):
+    """Distância do centro até o pixel aceso mais distante.
+
+    Numa linha qualquer, quem está mais longe do centro é sempre o pixel
+    mais à esquerda ou o mais à direita — então basta olhar as pontas.
+    """
+    w, h = mask.size
+    data = mask.tobytes()
+    best = 0.0
+    for y in range(h):
+        row = data[y * w:(y + 1) * w]
+        i = row.find(255)
+        if i < 0:
+            continue
+        dy = y - cy
+        best = max(best, math.hypot(i - cx, dy), math.hypot(row.rfind(255) - cx, dy))
+    return best
+
+
+def split_mark(mark):
+    """
+    Separa a marca em coroa e miolo.
+
+    A tinta (o que tem cor de verdade) é a coroa. Os vazados dessa coroa
+    que não encostam na borda são o disco atrás do "S" — e o vazado dentro
+    desse disco é o próprio "S". Duas operações de preenchimento resolvem
+    a geometria inteira, sem precisar saber nada sobre o desenho.
+
+    Devolve (coroa, disco) como máscaras 0/255 do tamanho da marca.
+    """
+    hsv = mark.convert("RGB").convert("HSV")
+    sat = hsv.getchannel("S").point(lambda v: 255 if v > 90 else 0)
+    val = hsv.getchannel("V").point(lambda v: 255 if v > 70 else 0)
+    opaque = mark.getchannel("A").point(lambda v: 255 if v > 128 else 0)
+
+    ink = ImageChops.multiply(ImageChops.multiply(sat, val), opaque)
+    ink = ink.filter(ImageFilter.MedianFilter(3))          # tira a poeira do JPEG
+
+    body = _fill_holes(ink)                                 # silhueta cheia
+    disc = _fill_holes(ImageChops.subtract(body, ink))      # o disco, agora com o S junto
+    disc = disc.filter(ImageFilter.MedianFilter(5))         # arredonda a borda serrilhada
+    return ink, disc
+
+
+def dominant_ink(mark, ink):
+    """A cor mais presente da coroa — é com ela que o miolo é tampado."""
+    rgb = mark.convert("RGB")
+    void = (1, 2, 3)                       # marca o que não é tinta, para não contar
+    probe = Image.composite(rgb, Image.new("RGB", rgb.size, void), ink)
+    counts = [(n, c) for n, c in (probe.getcolors(1 << 22) or []) if c != void]
+    return max(counts)[1] if counts else ACCENT
+
+
+def build_mark_layers():
+    """
+    Escreve mark-sun.png (a coroa) e mark-core.png (o disco com o S).
+
+    As duas saem no mesmo quadrado, centradas no eixo do disco — empilhadas
+    na página elas remontam o logo original pixel a pixel. A diferença é que
+    agora dá para girar uma sem girar a outra.
+
+    Truque do miolo: na camada que gira, o buraco do disco é tampado com a
+    cor da coroa. Assim, enquanto ela roda, não existe nenhum vinco preto
+    passeando por baixo do "S" — só laranja liso.
+    """
+    ink, disc = split_mark(MARK)
+    cx, cy = _centroid(disc)
+    r_disc = _max_radius(disc, cx, cy)
+    silhouette = MARK.getchannel("A").point(lambda v: 255 if v > 10 else 0)
+    r_out = _max_radius(silhouette, cx, cy)
+
+    side = 2 * math.ceil(r_out + 6)
+    dx, dy = side / 2 - cx, side / 2 - cy
+
+    def recentre(img, fill):
+        return img.transform((side, side), Image.AFFINE, (1, 0, -dx, 0, 1, -dy),
+                             resample=Image.BICUBIC, fillcolor=fill)
+
+    # ── coroa: a marca com o miolo tampado de laranja ──
+    plug = Image.new("L", MARK.size, 0)
+    r = r_disc + 2
+    ImageDraw.Draw(plug).ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
+    sun = MARK.copy()
+    sun.paste(Image.new("RGBA", MARK.size, dominant_ink(MARK, ink) + (255,)), (0, 0), plug)
+
+    # ── miolo: só o disco, opaco de ponta a ponta ──
+    # o alfa do recorte original é irregular dentro do disco (preto sobre
+    # preto ninguém via); aqui ele precisa tapar mesmo, senão a coroa
+    # girando aparece por trás do S.
+    alpha = disc.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(.8))
+    core = MARK.convert("RGB").convert("RGBA")
+    core.putalpha(alpha)
+
+    recentre(sun, (0, 0, 0, 0)).save(os.path.join(ASSETS, "mark-sun.png"), optimize=True)
+    recentre(core, (0, 0, 0, 0)).save(os.path.join(ASSETS, "mark-core.png"), optimize=True)
+
+    fit = side / max(MARK.size)
+    print(f"  camadas: {side}×{side}px · eixo em ({cx:.1f}, {cy:.1f}) · "
+          f"disco r={r_disc:.1f} · --mark-fit sugerido: {fit * 100:.1f}%")
+    return side
 
 
 def paste_mark(img, size, cx, cy, glow=0.0):
@@ -329,7 +479,7 @@ def build_mark_png():
 
 if __name__ == "__main__":
     print(f"  cor detectada: #{ACCENT[0]:02x}{ACCENT[1]:02x}{ACCENT[2]:02x}")
-    print("marca…");   build_mark_png()
+    print("marca…");   build_mark_png(); build_mark_layers()
     print("ícones…");  build_icons()
     print("og…");      build_og()
     print("splash…");  tags = build_splash()

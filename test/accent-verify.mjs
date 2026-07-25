@@ -1,6 +1,7 @@
 /**
  * Verifica a promessa central: a cor do site sai do avatar.
- * Gera logos de várias cores, serve cada um como ./assets/mark.png e
+ * Gera logos de várias cores, serve cada um como ./assets/mark-sun.png
+ * (a camada que gira — é dela que a página tira a cor) e
  * confere o matiz que a página extraiu — além dos casos difíceis:
  * imagem em tons de cinza, imagem ausente e canvas bloqueado.
  *
@@ -91,7 +92,7 @@ const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript',
 const server = http.createServer((req, res) => {
   let file = decodeURIComponent(req.url.split('?')[0]);
   if (file === '/') file = '/index.html';
-  if (file === '/assets/mark.png'){
+  if (file === '/assets/mark-sun.png'){
     if (!mark){ res.writeHead(404); return res.end(); }        // simula imagem faltando
     res.writeHead(200, { 'Content-Type': 'image/png' });
     return res.end(mark);

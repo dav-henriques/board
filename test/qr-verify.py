@@ -24,6 +24,16 @@ CASES = [
     ("https://lume.art", "H"),
     ("Ação · coração — açaí ÿ", "M"),
     ("a", "M"),
+    # O nível H é o que o modal usa (a marca no meio do código come módulos,
+    # e é a redundância de H que paga essa conta). Estes tamanhos varrem as
+    # versões 6 a 11 em H — foi aí que uma linha errada na tabela de blocos
+    # passou despercebida uma vez.
+    ("h" * 50, "H"),
+    ("h" * 70, "H"),
+    ("h" * 84, "H"),
+    ("h" * 100, "H"),
+    ("h" * 120, "H"),
+    ("https://open.spotify.com/intl-pt/artist/15gNfmAD010F2Ux7t5t5Ed?si=OaH4F6j-TUurg9MajO4xBA", "H"),
     ("x" * 60, "M"),
     ("https://um-dominio-bem-longo-de-artista-musical.example.com/pagina/links/lume-oficial-2026", "M"),
     ("y" * 130, "M"),

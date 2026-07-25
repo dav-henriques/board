@@ -2,7 +2,7 @@
    Service worker — app shell offline
    Troque a versão sempre que publicar mudanças nos assets.
    ═══════════════════════════════════════════════════════════════ */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL   = `sunn-shell-${VERSION}`;
 const RUNTIME = `sunn-runtime-${VERSION}`;
 
@@ -11,6 +11,8 @@ const PRECACHE = [
   './index.html',
   './manifest.webmanifest',
   './assets/mark.png',
+  './assets/mark-sun.png',
+  './assets/mark-core.png',
   './assets/avatar.jpg',
   './assets/og.png',
   './icons/favicon.svg',

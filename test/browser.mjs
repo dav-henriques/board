@@ -61,8 +61,14 @@ async function run(name, opts, extra){
   const ready = await page.evaluate(() => document.body.classList.contains('is-ready'));
   ready ? pass(`${name}: entrada concluída`) : note(`${name}: body.is-ready não aplicado`);
 
+  // a quantidade sai do CONFIG, então o teste confere que a lista existe
+  // e que todo link tem destino — não um número fixo
   const rows = await page.locator('.row').count();
-  rows === 7 ? pass(`${name}: 7 links renderizados`) : note(`${name}: ${rows} links (esperado 7)`);
+  const hrefs = await page.locator('.row').evaluateAll(
+    (els) => els.filter((a) => a.getAttribute('href')).length);
+  rows > 0 && hrefs === rows
+    ? pass(`${name}: ${rows} links renderizados, todos com destino`)
+    : note(`${name}: ${rows} links, ${hrefs} com destino`);
 
   const opacity = await page.locator('.row').first().evaluate((el) => getComputedStyle(el.parentElement).opacity);
   Number(opacity) > 0.99 ? pass(`${name}: links visíveis`) : note(`${name}: opacidade final ${opacity}`);
@@ -79,6 +85,32 @@ async function run(name, opts, extra){
   accent.h > 10 && accent.h < 45
     ? pass(`${name}: acento extraído do logo — matiz ${accent.h}°, ${accent.s} ${accent.l}`)
     : note(`${name}: acento inesperado ${JSON.stringify(accent)}`);
+
+  // o sol gira, o "S" fica parado — é o contrato das duas camadas
+  const spin = await page.evaluate(() => {
+    const angle = (el) => {
+      const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+      return Math.round(Math.atan2(m.b, m.a) * 180 / Math.PI);
+    };
+    return {
+      sun:  angle(document.getElementById('avatar')),
+      core: angle(document.getElementById('avatarCore')),
+      anims: document.getElementById('avatar').getAnimations().length
+    };
+  });
+  const reduced = opts.reducedMotion === 'reduce';
+  if (reduced){
+    spin.anims === 0 && spin.sun === 0
+      ? pass(`${name}: movimento reduzido — o sol não gira`)
+      : note(`${name}: com movimento reduzido ainda há ${spin.anims} animação(ões)`);
+  } else {
+    spin.anims > 0 && spin.sun !== 0
+      ? pass(`${name}: sol girando (${spin.sun}°)`)
+      : note(`${name}: sol parado (${spin.anims} animações, ${spin.sun}°)`);
+    spin.core === 0
+      ? pass(`${name}: o "S" fica em pé`)
+      : note(`${name}: o "S" girou ${spin.core}°`);
+  }
 
   await page.screenshot({ path: path.join(SHOTS, `${name}-home.png`) });
   await page.screenshot({ path: path.join(SHOTS, `${name}-full.png`), fullPage: true });
@@ -121,11 +153,14 @@ await run('iphone', { ...devices['iPhone 14 Pro'], isMobile: true, hasTouch: tru
   sw ? pass(`${name}: service worker registrado`) : note(`${name}: service worker não registrado`);
 
   await page.waitForTimeout(1200);
+  const onlineRows = await page.locator('.row').count();
   await page.context().setOffline(true);
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(1600);
   const offlineRows = await page.locator('.row').count();
-  offlineRows === 7 ? pass(`${name}: página funciona offline`) : note(`${name}: offline renderizou ${offlineRows} links`);
+  offlineRows === onlineRows
+    ? pass(`${name}: página funciona offline (${offlineRows} links)`)
+    : note(`${name}: offline renderizou ${offlineRows} links, online eram ${onlineRows}`);
   await page.screenshot({ path: path.join(SHOTS, `${name}-offline.png`) });
   await page.context().setOffline(false);
 });

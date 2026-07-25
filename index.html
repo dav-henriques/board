@@ -101,8 +101,8 @@
   --dur:.42s;
   --dur-slow:.68s;
 
-  --gutter:clamp(20px,6vw,28px);
-  --col:min(430px, 100%);
+  --gutter:clamp(14px,4vw,22px);   /* a folga em volta dos cards */
+  --col:min(440px, 100%);
 
   --safe-t:env(safe-area-inset-top,0px);
   --safe-b:env(safe-area-inset-bottom,0px);
@@ -160,7 +160,7 @@ svg{display:block}
           mask-image:radial-gradient(125% 96% at 50% 54%, #000 26%, rgba(0,0,0,.55) 62%, transparent 88%);
   pointer-events:none;
 }
-body.is-ready #waves{opacity:0}
+body.is-ready #waves{opacity:1}
 
 /* halo central + vinheta: dá profundidade sem custo */
 .depth{
@@ -205,6 +205,9 @@ body.is-ready #waves{opacity:0}
   transform:translate3d(var(--px,0),var(--py,0),0);
   transition:transform 1.1s var(--ease-out);
 }
+/* o container é flex com align-items:center, então o <nav> encolheria até a
+   largura do conteúdo — é ele que precisa esticar para os cards preencherem */
+.stage__inner > nav{align-self:stretch}
 
 /* ── identidade ───────────────────────────────────────────── */
 .identity{
@@ -319,7 +322,7 @@ body.is-ready #waves{opacity:0}
 .row{
   position:relative;
   display:grid;
-  grid-template-columns:66px 1fr 15px;
+  grid-template-columns:22px 1fr 15px;
   align-items:center;
   gap:16px;
   min-height:66px;

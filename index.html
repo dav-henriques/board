@@ -83,6 +83,18 @@
      o desenho ao tamanho de sempre — o build-assets.py imprime o valor. */
   --mark-fit:106.4%;
 
+  /* QR invertido: código claro sobre carta escura.
+     A tinta segue a cor da marca, mas com piso de luminosidade — um logo
+     de cor escura não pode empurrar o código para baixo do contraste que
+     a câmera precisa.
+     --qr-eye pinta só os três quadrados de canto, por onde a câmera acha o
+     código. Em branco eles leem um tico melhor em foto ruim (~4 pontos nos
+     meus testes); aqui vão na cor da marca, porque a diferença é pequena e
+     o conjunto fica inteiro. Trocar por #fff devolve o contraste máximo. */
+  --qr-bg:#0b0b0d;
+  --qr-ink:var(--accent);
+  --qr-eye:var(--qr-ink);
+
   --ink-1:rgba(255,255,255,.94);
   --ink-2:rgba(255,255,255,.46);
   --ink-3:rgba(255,255,255,.28);
@@ -589,15 +601,19 @@ body.is-ready .avatar.is-pressed{
   --qr-size:min(70vw, 46vh, 420px);
   position:relative;
   width:calc(var(--qr-size) + 2 * clamp(16px,4vw,26px));
-  padding:clamp(16px,4vw,26px);
+  padding:clamp(18px,4.4vw,28px);
   border-radius:clamp(26px,7vw,38px);
-  background:#fff;
+  background:var(--qr-bg);
   box-shadow:
     0 40px 90px -40px rgba(0,0,0,1),
-    0 0 0 .5px rgba(255,255,255,.14),
+    inset 0 0 0 .5px rgba(255,255,255,.09),
     0 0 90px -30px hsl(var(--accent-h) var(--accent-s) 55% / .5);
 }
 .qr-card svg{width:100%;height:auto;display:block}
+/* o CSS manda na cor: assim o código acompanha o acento extraído do logo
+   mesmo que já tenha sido desenhado antes de a cor ser descoberta */
+.qr-card .qr-body{fill:var(--qr-ink)}
+.qr-card .qr-eye {fill:var(--qr-eye)}
 
 /* a marca cravada no meio do QR. O código é gerado em nível H (recupera
    ~30% dos módulos), então esse tapa-buraco de ~19% da largura — 3,6% da
@@ -611,12 +627,12 @@ body.is-ready .avatar.is-pressed{
   display:block;
   pointer-events:none;
 }
-.qr-mark::before{ /* respiro branco em volta, para o código não encostar no sol */
+.qr-mark::before{ /* respiro em volta, para o código não encostar no sol */
   content:"";
   position:absolute;
   inset:-26%;
   border-radius:50%;
-  background:#fff;
+  background:var(--qr-bg);
 }
 .qr-mark img{
   position:absolute;
@@ -1194,21 +1210,32 @@ const QR = (() => {
     return { size, modules, version: ver, mask: best };
   }
 
-  /* ── Saída em SVG (um único path: módulos vizinhos se fundem) ─ */
+  /* ── Saída em SVG ────────────────────────────────────────────
+     Dois paths, cada um com sua classe (.qr-body e .qr-eye), para o
+     CSS poder pintar os três quadrados de canto — os "olhos" — numa cor
+     diferente do resto. Não é enfeite: é por eles que a câmera acha o
+     código, então vale deixá-los no maior contraste possível mesmo
+     quando o corpo do código sai na cor da marca.
+     Vizinhos continuam se fundindo: os módulos vão todos no mesmo path. */
   function svg(text, opts = {}){
-    const { ecc = 'M', quiet = 2, dark = '#000', light = 'transparent' } = opts;
+    const { ecc = 'M', quiet = 2, dark = '#000', light = 'transparent', eye = dark } = opts;
     const qr = build(text, ecc);
     const dim = qr.size + quiet * 2;
-    let d = '';
+    const finder = (x, y) => (x < 7 || x >= qr.size - 7) && y < 7
+                          || (x < 7 && y >= qr.size - 7);
+    let body = '', eyes = '';
     for (let y = 0; y < qr.size; y++){
       for (let x = 0; x < qr.size; x++){
-        if (qr.modules[y][x]) d += `M${x + quiet} ${y + quiet}h1v1h-1z`;
+        if (!qr.modules[y][x]) continue;
+        const cell = `M${x + quiet} ${y + quiet}h1v1h-1z`;
+        if (finder(x, y)) eyes += cell; else body += cell;
       }
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dim} ${dim}" `
          + `shape-rendering="crispEdges" role="img" aria-label="QR Code da página">`
          + (light === 'transparent' ? '' : `<rect width="${dim}" height="${dim}" fill="${light}"/>`)
-         + `<path d="${d}" fill="${dark}"/></svg>`;
+         + `<path class="qr-body" d="${body}" fill="${dark}"/>`
+         + `<path class="qr-eye" d="${eyes}" fill="${eye}"/></svg>`;
   }
 
   return { build, svg };
@@ -1760,8 +1787,10 @@ const Sheet = (() => {
     if (painted === url) return;
     try {
       // nível H: o código recupera ~30% dos módulos, o que sobra de folga
-      // para a marca ficar cravada no meio sem atrapalhar a leitura
-      card.innerHTML = QR.svg(url, { ecc:'H', quiet:2 });
+      // para a marca ficar cravada no meio sem atrapalhar a leitura.
+      // As cores vêm do CSS (--qr-ink / --qr-eye); a zona de silêncio sobe
+      // para 3 módulos porque, invertido, o fundo não é mais infinito.
+      card.innerHTML = QR.svg(url, { ecc:'H', quiet:3 });
       painted = url;
       if (mark) mark.hidden = false;
     } catch (err){

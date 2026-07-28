@@ -4,12 +4,25 @@ Gera todos os assets visuais do site a partir de UMA imagem: assets/avatar.jpg.
 
     python3 build-assets.py
 
-O script recorta a marca, descobre sozinho a cor mais viva dela (a mesma
-lógica que o site usa em tempo de execução) e produz ícones, favicons,
-telas de abertura de iPhone e a imagem de compartilhamento já nessa cor.
-Trocou o logo, rodou de novo, tudo acompanha.
+O script recorta a marca e produz ícones, favicons, telas de abertura de
+iPhone e a imagem de compartilhamento. Trocou o logo, rodou de novo, tudo
+acompanha.
+
+A COR sai do index.html — de CONFIG.accent, a mesma linha que pinta o site.
+O que o navegador faz em tempo de execução com a marca (girar a matiz até
+a cor escolhida), este script faz aqui para tudo que o navegador não
+alcança: o ícone na tela do celular, a prévia no WhatsApp, o splash do
+iPhone. Um valor, um tema, sem nada fora de sintonia.
+
+Com CONFIG.accent em 'auto', volta o comportamento antigo: a cor é lida do
+próprio logo e nada é tingido.
+
+Nota: assets/mark.png, mark-sun.png e mark-core.png são gravados SEMPRE na
+cor original da arte. São a fonte, não o resultado — se saíssem tingidos, o
+tema seguinte giraria a matiz de uma matiz já girada e a cor iria embora
+andando a cada build.
 """
-import colorsys, math, os
+import colorsys, glob, io, json, math, os, re
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 ROOT   = os.path.dirname(os.path.abspath(__file__))
@@ -21,8 +34,11 @@ for d in (ASSETS, ICONS, SPLASH):
 
 SOURCE   = os.path.join(ASSETS, "avatar.jpg")
 MARK_PNG = os.path.join(ASSETS, "mark.png")
+INDEX    = os.path.join(ROOT, "index.html")
 WORDMARK = "SUNN"
 TAGLINE  = "Belo Horizonte · MG"
+
+L_FLOOR, L_CEIL = .42, .68        # a mesma faixa legível que o site usa
 
 FONT_BOLD  = "/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf"
 FONT_LIGHT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-ExtraLight.ttf"
@@ -146,8 +162,123 @@ def accent_from(mark):
     return (round(r * 255), round(g * 255), round(b * 255))
 
 
-MARK   = load_mark()
-ACCENT = accent_from(MARK)
+# ────────────────────────────────────────────────────────────────
+# A COR — lida do index.html, girada na arte
+# ────────────────────────────────────────────────────────────────
+def read_config(key, default=None):
+    """Pesca um valor do bloco CONFIG do index.html. Fonte única de verdade."""
+    try:
+        with open(INDEX, encoding="utf-8") as f:
+            txt = f.read()
+    except OSError:
+        return default
+    m = re.search(r"^\s*%s\s*:\s*'([^']*)'" % re.escape(key), txt, re.M)
+    return m.group(1).strip() if m else default
+
+
+def parse_color(text):
+    """Aceita '#f95b00', 'f95b00', 'rgb(249 91 0)' e 'hsl(22 100% 49%)'."""
+    if not text:
+        return None
+    t = text.strip().lower()
+
+    hexpart = t[1:] if t.startswith("#") else t
+    if re.fullmatch(r"[0-9a-f]{3,8}", hexpart) and len(hexpart) in (3, 4, 6, 8):
+        w = 1 if len(hexpart) <= 4 else 2
+        vals = [hexpart[i * w:(i + 1) * w] for i in range(3)]
+        return tuple(int(v * 2 if w == 1 else v, 16) for v in vals)
+
+    nums = [float(n) for n in re.findall(r"-?[\d.]+", t)]
+    if t.startswith("rgb") and len(nums) >= 3:
+        return tuple(max(0, min(255, round(n))) for n in nums[:3])
+    if t.startswith("hsl") and len(nums) >= 3:
+        r, g, b = colorsys.hls_to_rgb((nums[0] % 360) / 360, nums[2] / 100, nums[1] / 100)
+        return (round(r * 255), round(g * 255), round(b * 255))
+    return None
+
+
+def to_hls(rgb):
+    return colorsys.rgb_to_hls(*[c / 255 for c in rgb])
+
+
+def clamp_light(rgb):
+    """Prende a luminosidade na faixa em que a cor ainda se lê sobre preto."""
+    h, l, s = to_hls(rgb)
+    l = min(L_CEIL, max(L_FLOOR, l))
+    r, g, b = colorsys.hls_to_rgb(h, l, s)
+    return (round(r * 255), round(g * 255), round(b * 255))
+
+
+def tint_plan(base, target):
+    """
+    Quanto girar. Mesma conta do site: matiz por deslocamento, saturação
+    por razão, luz por potência (l' = l^γ) — que leva a luminosidade da
+    arte exatamente à da cor nova sem estourar claros nem lavar escuros.
+    """
+    bh, bl, bs = to_hls(base)
+    th, tl, ts = to_hls(target)
+    bl = min(.98, max(.02, bl))
+    tl = min(.98, max(.02, tl))
+    return (
+        (th - bh) * 360,
+        min(4, ts / bs) if bs > .04 else 1.0,
+        math.log(tl) / math.log(bl),
+    )
+
+
+def tint_image(img, plan):
+    """Gira a matiz de uma imagem RGBA inteira, preservando os degradês."""
+    import numpy as np
+
+    dh, ks, gam = plan
+    a = np.asarray(img.convert("RGBA"), dtype=np.float32)
+    rgb = a[..., :3] / 255.0
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+
+    mx, mn = rgb.max(axis=-1), rgb.min(axis=-1)
+    d = mx - mn
+    l = (mx + mn) / 2
+    safe = np.maximum(d, 1e-6)
+
+    denom = np.where(l > .5, np.maximum(2 - mx - mn, 1e-6), np.maximum(mx + mn, 1e-6))
+    s = np.where(d > 1e-6, d / denom, 0.0)
+
+    h = np.where(mx == r, ((g - b) / safe) % 6,
+        np.where(mx == g,  (b - r) / safe + 2,
+                           (r - g) / safe + 4))
+    h = ((h * 60 + dh) % 360) / 360
+    s = np.minimum(1.0, s * ks)
+    l = np.clip(l, 0, 1) ** gam
+
+    q = np.where(l < .5, l * (1 + s), l + s - l * s)
+    p = 2 * l - q
+
+    def chan(t):
+        t = (t + 1) % 1
+        out = np.where(t < 1/6, p + (q - p) * 6 * t,
+              np.where(t < 1/2, q,
+              np.where(t < 2/3, p + (q - p) * (2/3 - t) * 6, p)))
+        return out
+
+    a[..., :3] = np.clip(np.stack([chan(h + 1/3), chan(h), chan(h - 1/3)], -1) * 255, 0, 255)
+    return Image.fromarray(a.astype("uint8"), "RGBA")
+
+
+MARK = load_mark()
+
+_wanted = read_config("accent")
+_art    = parse_color(read_config("artColor")) or (0xf9, 0x5b, 0x00)
+_target = None if (not _wanted or _wanted.lower() == "auto") else parse_color(_wanted)
+
+if _target:
+    ACCENT = clamp_light(_target)
+    PLAN   = tint_plan(_art, ACCENT)
+    # sem giro perceptível (o tema de fábrica) não vale mexer nos pixels
+    MARK_OUT = MARK if abs(PLAN[0]) < .5 and abs(PLAN[1] - 1) < .01 and abs(PLAN[2] - 1) < .01 \
+               else tint_image(MARK, PLAN)
+else:
+    ACCENT   = accent_from(MARK)      # sem cor escolhida: o logo decide
+    MARK_OUT = MARK
 
 
 # ────────────────────────────────────────────────────────────────
@@ -281,8 +412,8 @@ def build_mark_layers():
 
 
 def paste_mark(img, size, cx, cy, glow=0.0):
-    """Aplica a marca de forma aditiva, com brilho opcional na cor dela."""
-    m = MARK.resize((size, size), Image.LANCZOS)
+    """Aplica a marca (já na cor do tema) de forma aditiva, com brilho opcional."""
+    m = MARK_OUT.resize((size, size), Image.LANCZOS)
     left, top = int(cx - size / 2), int(cy - size / 2)
     box = (left, top, left + size, top + size)
 
@@ -402,7 +533,7 @@ def build_icons():
     # favicon vetorial: moldura SVG com a marca embutida, nítida em qualquer tela
     import base64, io
     buf = io.BytesIO()
-    MARK.resize((128, 128), Image.LANCZOS).save(buf, "PNG", optimize=True)
+    MARK_OUT.resize((128, 128), Image.LANCZOS).save(buf, "PNG", optimize=True)
     b64 = base64.b64encode(buf.getvalue()).decode()
     with open(os.path.join(ICONS, "favicon.svg"), "w", encoding="utf-8") as f:
         f.write(
@@ -471,17 +602,130 @@ def build_og():
     img.save(os.path.join(ASSETS, "og.png"), optimize=True)
 
 
+# ────────────────────────────────────────────────────────────────
+# 4. A CAPA DO ÁLBUM — baixada do Spotify, guardada aqui do lado
+# ────────────────────────────────────────────────────────────────
+UA = "Mozilla/5.0 (compatible; board-build-assets/1.0)"
+
+
+def read_album():
+    """Lê o bloco CONFIG.album do index.html — a mesma fonte única."""
+    try:
+        with open(INDEX, encoding="utf-8") as f:
+            txt = f.read()
+    except OSError:
+        return {}
+    m = re.search(r"\balbum\s*:\s*\{(.*?)\n\s*\}", txt, re.S)
+    if not m:
+        return {}
+    body = m.group(1)
+    out = dict(re.findall(r"(\w+)\s*:\s*'([^']*)'", body))
+    out.update({k: v == "true" for k, v in re.findall(r"(\w+)\s*:\s*(true|false)\b", body)})
+    return out
+
+
+def build_album():
+    """
+    Deixa a capa e o nome do álbum em ./assets/album-<id>.jpg e .json
+
+    Achando esses arquivos, o site nem fala com o Spotify: a capa vem da
+    sua própria origem, entra no cache do app e continua aparecendo
+    offline. O ID no nome do arquivo é o que evita o acidente clássico —
+    trocar o link do álbum, esquecer de rodar isto, e ficar anunciando o
+    disco novo com a capa do antigo. Nome errado, arquivo não existe, o
+    site vai buscar ao vivo. Nunca a capa errada.
+
+    Nada aqui é obrigatório: sem rede, ou com o Spotify fora do ar, o
+    build segue e o site se vira sozinho.
+    """
+    a = read_album()
+    if not a.get("on") or not a.get("url"):
+        return "desligado"
+    if a.get("cover"):
+        return f"capa fixada à mão ({a['cover']}) — nada a baixar"
+
+    m = re.search(r"open\.spotify\.com/(?:intl-[a-z-]+/)?"
+                  r"(?:album|track|playlist|artist)/([A-Za-z0-9]+)", a["url"])
+    if not m:
+        return "o link não é do Spotify — o site tenta ao vivo"
+    key = m.group(1)
+
+    import urllib.parse, urllib.request
+
+    def get(url, timeout=15):
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read()
+
+    try:
+        meta = json.loads(get("https://open.spotify.com/oembed?url="
+                              + urllib.parse.quote(a["url"], safe="")))
+        thumb = meta.get("thumbnail_url")
+        if not thumb:
+            raise ValueError("a resposta veio sem thumbnail_url")
+
+        # O oEmbed entrega 300px, apertado para uma capa que ocupa meia
+        # tela em aparelho retina. A URL da imagem carrega o tamanho num
+        # prefixo; trocando por b273 vem a de 640. Se essa não existir,
+        # a original serve — por isso a tentativa é separada.
+        raw = None
+        big = re.sub(r"ab67616d0000(?:1e02|4851)", "ab67616d0000b273", thumb)
+        if big != thumb:
+            try:
+                raw = get(big)
+            except Exception:
+                raw = None
+        if raw is None:
+            raw = get(thumb)
+    except Exception as err:
+        return f"não deu para baixar ({err}) — o site busca ao vivo"
+
+    img = Image.open(io.BytesIO(raw)).convert("RGB")
+    if max(img.size) > 640:
+        img.thumbnail((640, 640), Image.LANCZOS)
+    img.save(os.path.join(ASSETS, f"album-{key}.jpg"), quality=88, optimize=True)
+
+    # A cor da capa, pela mesma heurística que o site usa no logo: vence o
+    # matiz de maior croma acumulado. Calculada aqui, o popup não precisa
+    # ler pixel nenhum no navegador — e nem depende de o CDN do Spotify
+    # liberar essa leitura, que é o caso em que a conta não fecharia.
+    tint = accent_from(img.convert("RGBA"))
+
+    with open(os.path.join(ASSETS, f"album-{key}.json"), "w", encoding="utf-8") as f:
+        json.dump({"title": meta.get("title", ""),
+                   "cover": f"./assets/album-{key}.jpg",
+                   "accent": "#%02x%02x%02x" % tint}, f, ensure_ascii=False)
+
+    # os álbuns antigos não precisam continuar ocupando a pasta
+    for old in glob.glob(os.path.join(ASSETS, "album-*")):
+        if os.path.basename(old) not in (f"album-{key}.jpg", f"album-{key}.json"):
+            os.remove(old)
+
+    return (f'"{meta.get("title", "")}" · {img.width}×{img.height}px · '
+            f'cor da capa #%02x%02x%02x' % tint)
+
+
 def build_mark_png():
-    """Versão recortada da marca, é ela que a página usa."""
+    """Versão recortada da marca, na cor original — é a fonte, não o resultado."""
     MARK.resize((720, 720), Image.LANCZOS).save(
         os.path.join(ASSETS, "mark.png"), optimize=True)
 
 
 if __name__ == "__main__":
-    print(f"  cor detectada: #{ACCENT[0]:02x}{ACCENT[1]:02x}{ACCENT[2]:02x}")
+    hexed = lambda c: "#%02x%02x%02x" % c
+    if _target:
+        print(f"  tema: {hexed(ACCENT)} (CONFIG.accent do index.html)")
+        if MARK_OUT is not MARK:
+            print(f"  arte {hexed(_art)} → {hexed(ACCENT)} · "
+                  f"matiz {PLAN[0]:+.1f}° · saturação ×{PLAN[1]:.2f} · luz ^{PLAN[2]:.2f}")
+        else:
+            print("  arte já está na cor do tema — nada a girar")
+    else:
+        print(f"  cor detectada no logo: {hexed(ACCENT)}  (CONFIG.accent = 'auto')")
     print("marca…");   build_mark_png(); build_mark_layers()
     print("ícones…");  build_icons()
     print("og…");      build_og()
+    print("álbum…");   print("  " + build_album())
     print("splash…");  tags = build_splash()
     with open(os.path.join(ROOT, "splash-tags.html"), "w", encoding="utf-8") as f:
         f.write("\n".join(tags) + "\n")

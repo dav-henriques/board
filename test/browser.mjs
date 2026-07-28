@@ -73,18 +73,28 @@ async function run(name, opts, extra){
   const opacity = await page.locator('.row').first().evaluate((el) => getComputedStyle(el.parentElement).opacity);
   Number(opacity) > 0.99 ? pass(`${name}: links visíveis`) : note(`${name}: opacidade final ${opacity}`);
 
-  // a cor de destaque tem que ter saído do avatar, não do valor padrão
+  // a cor de CONFIG.accent tem que ter chegado aos tokens — e ao QR, que
+  // ganha um piso de luminância próprio para continuar legível por câmera
   const accent = await page.evaluate(() => {
     const s = getComputedStyle(document.documentElement);
     return {
       h: parseFloat(s.getPropertyValue('--accent-h')),
       s: s.getPropertyValue('--accent-s').trim(),
-      l: s.getPropertyValue('--accent-l').trim()
+      l: s.getPropertyValue('--accent-l').trim(),
+      qr: s.getPropertyValue('--qr-ink').trim()
     };
   });
   accent.h > 10 && accent.h < 45
-    ? pass(`${name}: acento extraído do logo — matiz ${accent.h}°, ${accent.s} ${accent.l}`)
+    ? pass(`${name}: acento do tema — matiz ${accent.h}°, ${accent.s} ${accent.l} · qr ${accent.qr}`)
     : note(`${name}: acento inesperado ${JSON.stringify(accent)}`);
+
+  // com o tema de fábrica a arte já está na cor certa: ninguém redesenha pixel
+  const untouched = await page.evaluate(() =>
+    [...document.querySelectorAll('img[data-tint]')].every(
+      (i) => !i.src.startsWith('data:') && !i.classList.contains('is-raw')));
+  untouched
+    ? pass(`${name}: arte intacta — a cor do tema é a cor do logo`)
+    : note(`${name}: a arte foi redesenhada sem necessidade`);
 
   // o sol gira, o "S" fica parado — é o contrato das duas camadas
   const spin = await page.evaluate(() => {
@@ -175,8 +185,59 @@ await run('desktop', { viewport: { width: 1440, height: 900 }, deviceScaleFactor
   await page.waitForTimeout(900);
   await page.screenshot({ path: path.join(SHOTS, `${name}-qr.png`) });
 
+  /* A saída da folha, amostrada quadro a quadro.
+     Esta verificação existe por causa de um bug que passou despercebido
+     por versões: a folha voltava a visibility:hidden no primeiro quadro
+     do fechamento, e a animação inteira rodava atrás de uma cortina —
+     no olho, o modal simplesmente sumia. Um teste que só olhasse o estado
+     final continuaria passando. Este olha o meio do caminho. */
+  const saida = await page.evaluate(async () => {
+    const sheet = document.querySelector('#sheet');
+    const panel = sheet.querySelector('.sheet__panel');
+    const scrim = sheet.querySelector('.sheet__scrim');
+    const quadros = [];
+    document.querySelector('#closeBtn').click();
+    for (let i = 0; i < 12; i++){
+      await new Promise((r) => setTimeout(r, 50));
+      const cs = getComputedStyle(panel);
+      const m = cs.transform.match(/matrix\(([^)]*)\)/);
+      quadros.push({
+        visivel: getComputedStyle(sheet).visibility === 'visible',
+        painel:  +cs.opacity,
+        veu:     +getComputedStyle(scrim).opacity,
+        desceu:  m ? +m[1].split(',')[5] : 0
+      });
+    }
+    return {
+      quadros,
+      aberto:  sheet.classList.contains('is-open'),
+      saindo:  sheet.classList.contains('is-closing'),
+      fora:    sheet.hidden
+    };
+  });
+  // no meio da saída a folha precisa estar VISÍVEL, meio transparente e já descendo
+  const meio = saida.quadros.filter((q) => q.painel > .05 && q.painel < .95);
+  const animou = meio.length >= 2 && meio.every((q) => q.visivel) &&
+                 saida.quadros.some((q) => q.desceu > 12);
+  animou
+    ? pass(`${name}: a folha sai de cena à vista — ${meio.length} quadros a meio caminho, ` +
+           `descendo até ${Math.max(...saida.quadros.map((q) => q.desceu)).toFixed(0)}px`)
+    : note(`${name}: o fechamento não aparece — ${JSON.stringify(saida.quadros.slice(0, 6))}`);
+
+  // e o véu tem que sair DEPOIS do conteúdo, senão a página pula de volta
+  const atrasado = saida.quadros.every((q) => q.veu >= q.painel - .06);
+  atrasado
+    ? pass(`${name}: o véu escuro segura até o conteúdo ir embora`)
+    : note(`${name}: o véu sai antes do painel`);
+
+  saida.fora && !saida.aberto && !saida.saindo
+    ? pass(`${name}: a folha some do ar quando termina`)
+    : note(`${name}: sobrou estado depois do fechamento ${JSON.stringify(saida)}`);
+
+  await page.locator('#qrBtn').click();
+  await page.waitForTimeout(900);
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(900);
   const closed = await page.locator('#sheet').evaluate((el) => !el.classList.contains('is-open'));
   closed ? pass(`${name}: Esc fecha o modal`) : note(`${name}: Esc não fechou`);
 

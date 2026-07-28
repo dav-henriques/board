@@ -62,21 +62,23 @@
   --bg:#000;
 
   /* ── ACENTO ────────────────────────────────────────────────
-     Estes três valores são reescritos em tempo de execução com a
-     cor mais viva encontrada no avatar. Trocou a foto, trocou a cor
-     do site inteiro. O laranja abaixo é só o ponto de partida, usado
-     enquanto a imagem carrega (ou se a leitura não for possível). */
+     UMA COR MANDA NO SITE INTEIRO. Ela mora em CONFIG.accent, lá
+     embaixo no bloco ① do script — é o único lugar que você precisa
+     editar. Daqui saem os brilhos, as bordas, o QR, as ondas de
+     fundo e a própria matiz do logo, que é girada pixel a pixel até
+     a cor nova. Trocou a linha, trocou o clima do site.
+
+     Estes três números são o ponto de partida (o laranja da marca),
+     usados enquanto o script não roda. Depois quem manda é o CONFIG. */
   --accent-h:22;
   --accent-s:100%;
-  --accent-l:52%;
+  --accent-l:49%;
 
-  --accent:hsl(var(--accent-h) var(--accent-s) var(--accent-l));
-  --accent-bright:hsl(var(--accent-h) var(--accent-s) 62%);
-  --accent-06:hsl(var(--accent-h) var(--accent-s) 58% / .06);
-  --accent-12:hsl(var(--accent-h) var(--accent-s) 58% / .12);
-  --accent-22:hsl(var(--accent-h) var(--accent-s) 60% / .22);
-  --accent-40:hsl(var(--accent-h) var(--accent-s) 62% / .40);
-  --accent-glow:hsl(var(--accent-h) var(--accent-s) 55% / .26);
+  /* Giro de matiz aplicado às imagens. Fica em none quase sempre: só
+     entra em cena enquanto o recorte exato não chegou — ou de vez,
+     se o navegador não deixar ler os pixels da imagem (páginas
+     abertas direto do disco, em file://). Ver o módulo ③b. */
+  --tint:none;
 
   /* a marca vem em duas camadas, num quadrado maior que o recorte antigo
      (precisa de folga para girar sem cortar as pontas). --mark-fit devolve
@@ -113,10 +115,16 @@
   --ease:cubic-bezier(.32,.72,0,1);        /* padrão (sheets, transforms) */
   --ease-out:cubic-bezier(.22,1,.36,1);    /* saídas suaves */
   --ease-soft:cubic-bezier(.4,.14,.3,1);   /* micro-interações */
+  --ease-in:cubic-bezier(.55,.06,.68,.19); /* indo embora: acelera na saída */
 
   --dur-fast:.16s;
   --dur:.42s;
   --dur-slow:.68s;
+
+  /* quanto dura a folha saindo de cena. O JavaScript lê este valor daqui
+     para saber quando pode enfim tirar a folha do ar — mexer no tempo é
+     mexer só nesta linha, e os dois lados continuam de acordo. */
+  --sheet-out:.6s;
 
   --gutter:clamp(14px,4vw,22px);   /* a folga em volta dos cards */
   --col:min(440px, 100%);
@@ -125,6 +133,27 @@
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-l:env(safe-area-inset-left,0px);
   --safe-r:env(safe-area-inset-right,0px);
+}
+
+/* ── TUDO QUE DERIVA DO ACENTO ─────────────────────────────────
+   Estes ficam de propósito FORA do :root — ou melhor, não só nele.
+   Uma variável que usa var() é resolvida onde é declarada: se estes
+   morassem apenas no :root, desceriam para a página já prontos, na
+   cor do site, e reescrever --accent-h lá embaixo não mudaria nada.
+
+   Declarados também em [data-accent], qualquer pedaço da página pode
+   carregar essa marca, redefinir os três números e ver todo o resto se
+   recalcular dentro dele — sem tocar em mais nada. É assim que o popup
+   do álbum ganha a cor da capa enquanto o site continua na sua. */
+:root,
+[data-accent]{
+  --accent:hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  --accent-bright:hsl(var(--accent-h) var(--accent-s) 62%);
+  --accent-06:hsl(var(--accent-h) var(--accent-s) 58% / .06);
+  --accent-12:hsl(var(--accent-h) var(--accent-s) 58% / .12);
+  --accent-22:hsl(var(--accent-h) var(--accent-s) 60% / .22);
+  --accent-40:hsl(var(--accent-h) var(--accent-s) 62% / .40);
+  --accent-glow:hsl(var(--accent-h) var(--accent-s) 55% / .26);
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -286,6 +315,16 @@ body.is-ready .avatar.is-pressed{
 }
 /* o miolo não precisa de brilho próprio: o do sol já passa por baixo dele */
 .avatar__core{filter:none;z-index:2}
+
+/* Enquanto a tinta exata não assenta, um giro de matiz do próprio CSS
+   segura a cor — a marca nunca pisca laranja num site azul. Cada imagem
+   larga o .is-raw sozinha, no quadro em que seus pixels certos entram;
+   no tema padrão a classe nem chega a ser posta, e isto custa zero. */
+.avatar__sun.is-raw{
+  filter:var(--tint) drop-shadow(0 0 32px hsl(var(--accent-h) var(--accent-s) 55% / .32));
+}
+.avatar__core.is-raw{filter:var(--tint)}
+.qr-mark img.is-raw{filter:var(--tint)}
 .avatar__sun{z-index:1;transform-origin:50% 50%;will-change:transform}
 
 .avatar.is-circle{border-radius:50%;width:clamp(112px,30vw,130px)}
@@ -333,6 +372,51 @@ body.is-ready .avatar.is-pressed{
   50%    {opacity:1;  box-shadow:0 0 14px var(--accent-40)}
 }
 .eyebrow:empty{display:none}
+
+/* ── selo do álbum ────────────────────────────────────────────
+   Depois que o popup já apareceu uma vez ele não volta a abrir
+   sozinho — este selo é a porta de volta. Discreto o bastante para
+   conviver com a marca, aceso o bastante para ser notado. */
+.badge-wrap{margin-top:18px;display:flex;justify-content:center}
+.badge-wrap[hidden]{display:none}
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:9px;
+  height:33px;
+  padding:0 15px 0 13px;
+  border-radius:999px;
+  font-size:10.5px;
+  font-weight:500;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--accent-bright);
+  background:var(--accent-06);
+  border:.5px solid var(--accent-22);
+  -webkit-backdrop-filter:blur(18px) saturate(160%);
+          backdrop-filter:blur(18px) saturate(160%);
+  transition:
+    transform var(--dur-slow) var(--ease),
+    background-color var(--dur) var(--ease-soft),
+    border-color var(--dur) var(--ease-soft);
+}
+.badge::before{                    /* o mesmo pip que respira no eyebrow */
+  content:"";
+  width:5px;height:5px;
+  border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 10px var(--accent-40);
+  flex:none;
+  animation:pip 7.5s var(--ease-soft) infinite;
+}
+@media (hover:hover) and (pointer:fine){
+  .badge:hover{
+    background:var(--accent-12);
+    border-color:var(--accent-40);
+    box-shadow:0 0 26px -10px hsl(var(--accent-h) var(--accent-s) 55% / .5);
+  }
+}
+.badge:active{transform:scale(.95);transition-duration:var(--dur-fast)}
 
 /* O nome fica desligado por padrão (CONFIG.showName): a marca já diz quem é.
    Ligando, ele entra como wordmark grande logo abaixo do sol. */
@@ -558,7 +642,14 @@ body.is-ready .avatar.is-pressed{
   visibility:hidden;
   padding:calc(var(--safe-t) + 24px) calc(var(--gutter) + var(--safe-r)) calc(var(--safe-b) + 24px) calc(var(--gutter) + var(--safe-l));
 }
-.sheet.is-open{visibility:visible}
+/* Visível também durante a saída — e é uma correção, não um detalhe: com
+   visibility:hidden voltando no primeiro quadro do fechamento, a animação
+   inteira rodava atrás de uma cortina. A folha não sumia devagar, ela
+   simplesmente desaparecia, e os 550ms de transição eram gastos à toa.
+   Durante a saída nada mais responde ao toque: o gesto já foi dado. */
+.sheet.is-open,
+.sheet.is-closing{visibility:visible}
+.sheet.is-closing{pointer-events:none}
 
 .sheet__scrim{
   position:absolute;inset:0;
@@ -590,6 +681,38 @@ body.is-ready .avatar.is-pressed{
     opacity .42s var(--ease-out) .06s,
     filter .56s var(--ease-out) .06s,
     transform .72s var(--ease) .04s;
+}
+
+/* ── A SAÍDA ──────────────────────────────────────────────────
+   Não é a entrada de trás para frente. Entrando, a folha sobe e
+   ganha nitidez com calma, porque é uma chegada. Saindo, ela desce
+   acelerando — o único movimento que o corpo já sabe ler sem
+   pensar — e some antes de terminar a descida, para o gesto
+   parecer que continua fora da tela em vez de parar no meio.
+
+   O véu escuro fica um instante a mais, e sai devagar. É ele que
+   segura a página no lugar enquanto o conteúdo vai embora; tirando
+   os dois juntos, o site aparece de supetão atrás e tudo "pula".
+   Essa defasagem de 120ms é a diferença entre fechar e piscar. */
+.sheet.is-closing .sheet__panel{
+  opacity:0;
+  filter:blur(6px);
+  transform:scale(.972) translate3d(0,48px,0);
+  transition:
+    opacity .34s var(--ease-in),
+    filter .36s var(--ease-in),
+    transform .42s var(--ease-in);
+}
+.sheet.is-closing .sheet__scrim{
+  opacity:0;
+  /* Curva própria, e vale explicar as duas que ela substituiu. Uma de
+     saída (--ease-out) despenca no primeiro terço: o véu ia embora ANTES
+     do painel, o contrário do que se quer. Uma de entrada (--ease-in)
+     segura bem, mas guarda a queda inteira para o fim e o escuro estala
+     em vez de se dissolver.
+     Esta fica quase parada no começo, enquanto o conteúdo desce, e depois
+     desce sozinha com um fim macio. Segura, e então dissolve. */
+  transition:opacity .42s cubic-bezier(.6,.04,.4,.95) .14s;
 }
 
 .qr-caption{
@@ -652,6 +775,115 @@ body.is-ready .avatar.is-pressed{
   color:var(--ink-2);
   word-break:break-all;
 }
+/* ────────────────────────────────────────────────────────────
+   O ÁLBUM — a mesma folha do QR, outro conteúdo
+   ──────────────────────────────────────────────────────────── */
+.album-cover{
+  position:relative;
+  display:block;
+  width:min(70vw, 40vh, 340px);
+  aspect-ratio:1;
+  border-radius:clamp(18px,4.6vw,26px);
+  overflow:hidden;
+  background:#0c0c0e;
+  /* o brilho por baixo é o mesmo do card do QR: a capa parece acesa,
+     não colada */
+  box-shadow:
+    0 44px 90px -42px rgba(0,0,0,1),
+    inset 0 0 0 .5px rgba(255,255,255,.1),
+    0 0 90px -26px hsl(var(--accent-h) var(--accent-s) 55% / .45);
+  transition:transform var(--dur-slow) var(--ease);
+}
+/* sem capa (ainda carregando, ou o Spotify fora do ar): um degradê na
+   cor do tema no lugar do buraco preto. Fica ATRÁS da imagem — quando a
+   capa chega, ela cobre isto por inteiro. */
+.album-cover::before{
+  content:"";
+  position:absolute;inset:0;
+  z-index:0;
+  background:
+    radial-gradient(120% 100% at 30% 18%, hsl(var(--accent-h) var(--accent-s) 56% / .5), transparent 62%),
+    linear-gradient(150deg, hsl(var(--accent-h) var(--accent-s) 34% / .5), #0a0a0c 78%);
+}
+.album-cover img{
+  position:relative;
+  z-index:1;
+  width:100%;height:100%;
+  object-fit:cover;
+  display:block;
+  opacity:0;
+  transition:opacity .5s var(--ease-out);
+}
+.album-cover img.is-on{opacity:1}
+@media (hover:hover) and (pointer:fine){
+  .album-cover:hover{transform:scale(1.02)}
+}
+.album-cover:active{transform:scale(.985);transition-duration:var(--dur-fast)}
+
+/* título e subtítulo andam juntos, com respiro próprio: o gap da folha é
+   grande demais entre os dois, e assim qualquer um dos dois pode faltar
+   sem deixar buraco */
+.album-text{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:9px;
+}
+.album-title{
+  margin:0;
+  max-width:18ch;
+  text-align:center;
+  font-size:clamp(25px,7.4vw,33px);
+  font-weight:600;
+  letter-spacing:-.032em;
+  line-height:1.06;
+  text-wrap:balance;
+}
+.album-sub{
+  margin:0;
+  max-width:28ch;
+  text-align:center;
+  font-size:13.5px;
+  font-weight:300;
+  line-height:1.5;
+  color:var(--ink-2);
+  text-wrap:balance;
+}
+.album-title:empty,
+.album-sub:empty{display:none}
+
+.album-cta{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  height:52px;
+  padding:0 27px;
+  border-radius:999px;
+  font-size:15px;
+  font-weight:500;
+  letter-spacing:-.012em;
+  /* preto ou branco, o que ler melhor sobre o acento — quem decide é o
+     módulo do tema, que mede o contraste de verdade */
+  color:var(--on-accent,#000);
+  background:var(--accent);
+  box-shadow:
+    0 20px 44px -24px var(--accent),
+    0 0 38px -16px var(--accent-40);
+  transition:
+    transform var(--dur-slow) var(--ease),
+    filter var(--dur) var(--ease-soft),
+    box-shadow var(--dur) var(--ease-soft);
+}
+.album-cta svg{width:19px;height:19px;flex:none}
+@media (hover:hover) and (pointer:fine){
+  .album-cta:hover{
+    filter:brightness(1.1);
+    transform:translate3d(0,-2px,0);
+    box-shadow:0 26px 52px -24px var(--accent), 0 0 48px -14px var(--accent-40);
+  }
+}
+.album-cta:active{transform:scale(.96);transition-duration:var(--dur-fast)}
+
 .sheet__close{
   display:inline-flex;align-items:center;gap:8px;
   height:44px;padding:0 22px;
@@ -776,14 +1008,17 @@ body.is-ready .reveal{
 
     <header class="identity">
       <div class="avatar reveal" id="mark" style="--d:.02s">
-        <img class="avatar__sun" id="avatar" src="./assets/mark-sun.png" alt=""
+        <img class="avatar__sun" id="avatar" src="./assets/mark-sun.png" alt="" data-tint
              width="766" height="766" decoding="async" fetchpriority="high">
-        <img class="avatar__core" id="avatarCore" src="./assets/mark-core.png" alt=""
+        <img class="avatar__core" id="avatarCore" src="./assets/mark-core.png" alt="" data-tint
              width="766" height="766" decoding="async" fetchpriority="high" aria-hidden="true">
       </div>
       <p class="eyebrow reveal" id="eyebrow" style="--d:.09s"></p>
       <h1 class="name reveal" id="name" style="--d:.14s"></h1>
       <p class="bio reveal" id="bio" style="--d:.2s"></p>
+      <div class="badge-wrap reveal" id="albumBadgeWrap" style="--d:.26s" hidden>
+        <button class="badge" id="albumBadge" type="button" aria-haspopup="dialog"></button>
+      </div>
     </header>
 
     <nav aria-label="Links">
@@ -805,20 +1040,42 @@ body.is-ready .reveal{
 </div>
 
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
-  <div class="sheet__scrim" id="scrim"></div>
+  <div class="sheet__scrim" id="scrim" data-close></div>
   <div class="sheet__panel">
     <p class="qr-caption" id="sheetTitle">Aponte a câmera</p>
     <div class="qr-card" id="qrCard">
       <div id="qrCode"></div>
       <span class="qr-mark" aria-hidden="true">
-        <img class="qr-mark__sun" id="qrSun" src="./assets/mark-sun.png" alt="" decoding="async">
-        <img src="./assets/mark-core.png" alt="" decoding="async">
+        <img class="qr-mark__sun" id="qrSun" src="./assets/mark-sun.png" alt="" data-tint decoding="async">
+        <img src="./assets/mark-core.png" alt="" data-tint decoding="async">
       </span>
     </div>
     <p class="qr-url" id="qrUrl"></p>
-    <button class="sheet__close" id="closeBtn" type="button">
+    <button class="sheet__close" id="closeBtn" type="button" data-close>
       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><use href="#i-close"></use></svg>
       Fechar
+    </button>
+  </div>
+</div>
+
+<div class="sheet" id="albumSheet" data-accent role="dialog" aria-modal="true" aria-labelledby="albumTitle" hidden>
+  <div class="sheet__scrim" data-close></div>
+  <div class="sheet__panel">
+    <p class="qr-caption" id="albumNote"></p>
+    <a class="album-cover" id="albumCover" target="_blank" rel="noopener noreferrer">
+      <img id="albumArt" alt="" decoding="async">
+    </a>
+    <div class="album-text">
+      <h2 class="album-title" id="albumTitle"></h2>
+      <p class="album-sub" id="albumSub"></p>
+    </div>
+    <a class="album-cta" id="albumCta" target="_blank" rel="noopener noreferrer">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-spotify"></use></svg>
+      <span id="albumCtaText"></span>
+    </a>
+    <button class="sheet__close" type="button" data-close>
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><use href="#i-close"></use></svg>
+      Agora não
     </button>
   </div>
 </div>
@@ -1250,6 +1507,35 @@ const QR = (() => {
    ①  CONFIGURAÇÃO — edite apenas este bloco
    ═══════════════════════════════════════════════════════════════ */
 const CONFIG = {
+  /* ─────────────────────────────────────────────────────────────
+     A COR. Uma linha só, e o site inteiro vira outro.
+
+     Daqui saem os brilhos, as bordas, os ícones no hover, o QR, as
+     ondas do fundo — e a própria marca, que tem a matiz girada pixel
+     a pixel até esta cor. Laranja, e o site é quente; troque por um
+     ciano e ele fica gelado, com o sol junto.
+
+     Aceita '#f95b00', 'f95b00', 'rgb(249 91 0)', 'hsl(22 100% 49%)'
+     ou 'auto' — em 'auto' a cor volta a ser lida do próprio logo,
+     como era antes, e a arte fica na cor original.
+
+     Para experimentar sem editar nada, jogue na URL:
+         ?accent=00e0ff     ?accent=%23b400ff     ?accent=auto
+     Achou a cor? Copie o hex para cá e pronto.
+
+     Depois de trocar, rode `python3 build-assets.py`: o script lê esta
+     mesma linha e refaz na cor nova o que o navegador não alcança — o
+     ícone do app, o favicon, a prévia de compartilhamento, o splash do
+     iPhone. E suba o VERSION do sw.js, senão quem já instalou o app
+     continua vendo o ícone antigo.
+     ───────────────────────────────────────────────────────────── */
+  accent:  '#000d72',
+
+  // A cor em que a arte FOI DESENHADA — o ponto de partida do giro de
+  // matiz. Só mexa aqui se trocar os PNGs da marca por outros de cor
+  // diferente; é o que mantém 'accent' significando a cor que se vê.
+  artColor:'#f95b00',
+
   name:    'sunn',
   eyebrow: 'Belo Horizonte · MG',
   bio:     '',                        // opcional — deixe vazio para não aparecer
@@ -1257,12 +1543,50 @@ const CONFIG = {
   // As duas camadas saem do build-assets.py (build_mark_layers), a partir
   // de ./assets/mark.png: a coroa do sol e o disco com o "S". Empilhadas
   // elas remontam o logo — só que a de cima não gira.
-  avatar:  './assets/mark-sun.png',   // a coroa (é dela que sai a cor do site)
+  avatar:  './assets/mark-sun.png',   // a coroa (em 'auto', é dela que sai a cor)
   core:    './assets/mark-core.png',  // o disco com o "S", sempre em pé
   shape:   'mark',                    // 'mark' = logo solto · 'circle' = foto recortada
   spin:    16,                        // segundos por volta do sol · 0 desliga
   waves:   false,                     // ondas de fundo · false = preto puro
   footer:  '© 2026 sunn.',
+
+  /* ─────────────────────────────────────────────────────────────
+     O ÁLBUM. Uma chave liga, uma chave desliga.
+
+     Com `on: true` e o link colado, o popup sobe sozinho na primeira
+     visita de cada pessoa — capa, nome e um botão. Depois disso ele
+     não volta a abrir: fica só o selo embaixo da marca, que reabre no
+     clique. Lançou outro álbum? É outro link, e o popup volta a subir
+     para todo mundo, sozinho.
+
+     Acabou a temporada de divulgação? `on: false` e some tudo — selo,
+     popup, o carregamento da capa. Nada disso chega a existir na página.
+
+     A CAPA E O NOME vêm do próprio Spotify: cole o link do álbum em
+     `url` e pronto, não precisa baixar nada. (Rodando o build-assets.py
+     depois, uma cópia da capa fica guardada aqui do lado, e aí o popup
+     nem depende mais do Spotify estar no ar.)
+
+     Para ver como ficou sem esperar: ?album=1 na URL abre na hora,
+     mesmo que você já tenha visto.
+     ───────────────────────────────────────────────────────────── */
+  album: {
+    on:     true,
+    url:    'https://open.spotify.com/intl-pt/album/58isKrcYSak1iIObj8gwvY?si=Dx0TU12WTli2M-QiWvVnmQ',
+    note:   'novo álbum',            // a linha pequena em cima da capa
+    title:  '',                      // vazio = o nome que vier do Spotify
+    sub:    '',                      // opcional: "7 faixas · 2026", uma frase sua
+    cta:    'Ouvir no Spotify',      // o texto do botão
+    badge:  'novo álbum',            // o texto do selo embaixo da marca
+    cover:  '',                      // opcional: './assets/minha-capa.jpg' manda em tudo
+    accent: 'auto',                  // a cor DENTRO do popup — ver abaixo
+    once:   false                     // false = abre em toda visita, sem trégua
+  },
+  /* album.accent  ·  'auto'  = tirada da própria capa (é o padrão: por
+                                trinta segundos o anúncio fala a língua
+                                do disco, e o resto do site nem sente)
+                    ·  '#hex' = uma cor sua, se a capa render algo feio
+                    ·  'tema' = fica na cor do site, sem invenção        */
 
   // ícones disponíveis: spotify · applemusic · youtube · instagram
   //                     tiktok · soundcloud · bandcamp · link · mail
@@ -1338,8 +1662,11 @@ function paint(){
          <rect width="200" height="200" fill="url(#g)"/>
        </svg>`);
   };
-  // assim que a imagem existir, ela define a cor de todo o site
+  // Com CONFIG.accent em 'auto', é a imagem que define a cor do site —
+  // trocou a arte, trocou tudo. Com uma cor escolhida, o logo não opina:
+  // quem gira de matiz para acompanhar é ele (ver o módulo ③d).
   const readAccent = () => {
+    if (Theme.fixed) return;
     Accent.reset();
     if (img.naturalWidth && Accent.apply(img)) Waves.retint();
   };
@@ -1397,7 +1724,173 @@ function paint(){
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   ③b  ACENTO — a cor sai do próprio avatar
+   ③b  TEMA — a cor que manda em tudo
+   ───────────────────────────────────────────────────────────────
+   Entra uma cor (CONFIG.accent, ou ?accent= na URL) e saem os três
+   números de que o CSS inteiro vive: --accent-h/s/l. Halos, bordas,
+   o facho que segue o cursor, as ondas do fundo, o QR — tudo é
+   derivado deles. Trocar a cor é trocar uma linha.
+
+   Duas correções acontecem no caminho, e valem o comentário:
+
+   • A luminosidade é presa na faixa em que uma cor de interface ainda
+     se lê sobre preto. Um vinho quase preto vira brilho invisível; um
+     pastel lavado vira borrão. Matiz e saturação são escolha sua — a
+     luz a gente segura, senão o site quebra em metade das cores.
+
+   • O QR ganha um piso próprio, e por luminância de verdade, não pelo
+     "L" do HSL: um azul em L=50% já é escuro para a câmera do celular,
+     mesmo parecendo médio no papel. A tinta do código sobe sozinha até
+     passar no contraste de que um leitor precisa, sem clarear o resto
+     do site junto. É o que faz um tema azul-marinho continuar tendo um
+     QR que funciona.
+   ═══════════════════════════════════════════════════════════════ */
+const Theme = (() => {
+  const L_FLOOR = 42, L_CEIL = 68;   // faixa legível para cor de interface
+  const QR_BG   = [11, 11, 13];      // --qr-bg
+  const QR_MIN  = 5;                 // razão de contraste mínima do código
+
+  function rgbToHsl(r, g, b){
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const l = (max + min) / 2, d = max - min;
+    if (!d) return { h:0, s:0, l };
+    const s = l > .5 ? d / (2 - max - min) : d / (max + min);
+    let h;
+    if (max === r)      h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else                h = (r - g) / d + 4;
+    return { h:h * 60, s, l };
+  }
+
+  /**
+   * Aceita qualquer notação de cor que o CSS entenda — e mais o hex
+   * sem cerquilha, que é como a gente escreve numa URL. Hex é lido à
+   * mão (é o caso de sempre, não vale acordar o layout por ele); o
+   * resto vai no melhor parser de cor que existe: o próprio navegador.
+   */
+  function parse(input){
+    if (!input) return null;
+    let str = String(input).trim();
+
+    const hex = str.replace(/^#/, '');
+    if (/^(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(hex)){
+      const w = hex.length <= 4 ? 1 : 2;
+      const at = (i) => {
+        const s = hex.substr(i * w, w);
+        return parseInt(w === 1 ? s + s : s, 16);
+      };
+      return rgbToHsl(at(0), at(1), at(2));
+    }
+
+    const probe = document.createElement('span');
+    probe.style.display = 'none';
+    probe.style.color = str;
+    if (!probe.style.color) return null;              // notação recusada
+    document.documentElement.appendChild(probe);
+    const out = getComputedStyle(probe).color;
+    probe.remove();
+    const n = out.match(/[\d.]+/g);
+    return n && n.length >= 3 ? rgbToHsl(+n[0], +n[1], +n[2]) : null;
+  }
+
+  /* luminância relativa (WCAG) — o que a câmera enxerga, não o que o
+     seletor de cor mostra */
+  function lum(r, g, b){
+    const f = (v) => (v /= 255) <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4;
+    return .2126 * f(r) + .7152 * f(g) + .0722 * f(b);
+  }
+  function ratio(a, b){
+    const hi = Math.max(a, b), lo = Math.min(a, b);
+    return (hi + .05) / (lo + .05);
+  }
+
+  function hslToRgb(h, s, l){
+    h = ((h % 360) + 360) % 360 / 360;
+    if (!s) { const v = Math.round(l * 255); return [v, v, v]; }
+    const q = l < .5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const hue = (t) => {
+      t = (t + 1) % 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    return [hue(h + 1/3), hue(h), hue(h - 1/3)].map((v) => Math.round(v * 255));
+  }
+
+  /** Sobe a luminosidade da tinta do QR até a câmera dar conta. */
+  function qrInk(h, s, l){
+    const bg = lum(...QR_BG);
+    for (let L = Math.round(l * 100); L <= 92; L++){
+      if (ratio(lum(...hslToRgb(h, s, L / 100)), bg) >= QR_MIN)
+        return `hsl(${h.toFixed(1)} ${(s * 100).toFixed(1)}% ${L}%)`;
+    }
+    return '#fff';                                    // nem no branco? branco.
+  }
+
+  let fixed = false;
+
+  /**
+   * Escreve a cor nos tokens de um elemento. No <html> ela vale para a
+   * página toda; em qualquer outro elemento marcado com [data-accent],
+   * só ali dentro — é o que deixa o popup do álbum ter cor própria.
+   * Devolve o {h,s,l} que de fato ficou valendo, já corrigido.
+   */
+  function paint(el, { h, s, l }){
+    const root = el === document.documentElement;
+    const L = Math.min(L_CEIL, Math.max(L_FLOOR, l * 100));
+    const st = el.style;
+    st.setProperty('--accent-h', h.toFixed(1));
+    st.setProperty('--accent-s', (s * 100).toFixed(1) + '%');
+    st.setProperty('--accent-l', L.toFixed(1) + '%');
+    st.setProperty('--qr-ink', qrInk(h, s, L / 100));
+
+    // o que escrever EM CIMA do acento (o botão do álbum): preto ou branco,
+    // o que ler melhor. Medido, não chutado — um amarelo pede preto, um
+    // azul-marinho pede branco, e nenhum dos dois combina com o outro.
+    const rgb = hslToRgb(h, s, L / 100);
+    const al = lum(...rgb);
+    st.setProperty('--on-accent', ratio(al, 0) >= ratio(al, 1) ? '#000' : '#fff');
+
+    // o Safari pinta a aba fixada com esta cor — só faz sentido na página
+    const pin = root && document.querySelector('link[rel="mask-icon"]');
+    if (pin) pin.setAttribute('color', '#' + rgb.map((v) => v.toString(16).padStart(2, '0')).join(''));
+
+    return { h, s, l:L / 100 };
+  }
+
+  const set = (hsl) => paint(document.documentElement, hsl);
+
+  /**
+   * Resolve a cor do site. A URL tem a última palavra (é o modo de
+   * experimentar sem editar arquivo); depois vem o CONFIG. Em 'auto'
+   * nada é fixado e o site volta a tirar a cor do próprio logo.
+   */
+  function init(){
+    let want = CONFIG.accent;
+    try {
+      const q = new URLSearchParams(location.search).get('accent');
+      if (q) want = q;
+    } catch { /* URL estranha: segue o CONFIG */ }
+
+    if (!want || /^auto$/i.test(want)) return null;
+
+    const hsl = parse(want);
+    if (!hsl) return null;                            // cor ilegível: cai no auto
+    fixed = true;
+    return set(hsl);
+  }
+
+  return {
+    init, parse, set, paint, hslToRgb, rgbToHsl,
+    get fixed(){ return fixed; }
+  };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   ③c  ACENTO — a cor sai do próprio avatar
    ───────────────────────────────────────────────────────────────
    Desenha a imagem num canvas pequeno, joga cada pixel num balde de
    matiz e pesa cada um pelo croma (o quanto a cor é "colorida" de
@@ -1485,24 +1978,33 @@ const Accent = (() => {
     };
   }
 
-  /** Aplica a cor encontrada. Silenciosamente mantém o padrão se falhar. */
-  function apply(img){
+  /**
+   * Lê a cor de uma imagem e devolve {h,s,l} pronto para virar interface,
+   * ou null se não der (imagem sem cor, ou canvas bloqueado).
+   *
+   * A cor de uma arte vira cor de interface com duas correções: saturação
+   * com piso, para que um logo apagado ainda renda algo visível, e
+   * luminosidade normalizada — senão um vinho escuro ou um pastel lavado
+   * viraria um brilho ilegível sobre o preto.
+   */
+  function read(img){
     let hsl;
     try { hsl = analyse(img); }
-    catch { hsl = null; }                                // canvas bloqueado
-    if (!hsl) return false;
+    catch { return null; }                               // canvas bloqueado
+    if (!hsl) return null;
+    return {
+      h: hsl.h,
+      s: Math.min(1, Math.max(.55, hsl.s)),
+      l: Math.min(.64, Math.max(.46, hsl.l * .85 + .12))
+    };
+  }
 
-    // A cor da marca vira cor de interface: saturação com piso (para logos
-    // apagados renderem algo visível) e luminosidade normalizada, senão um
-    // vinho escuro ou um pastel claro viraria um brilho ilegível.
-    const s = Math.round(Math.min(1, Math.max(.55, hsl.s)) * 100);
-    const l = Math.round(Math.min(64, Math.max(46, hsl.l * 100 * .85 + 12)));
-
-    const root = document.documentElement.style;
-    root.setProperty('--accent-h', hsl.h.toFixed(1));
-    root.setProperty('--accent-s', s + '%');
-    root.setProperty('--accent-l', l + '%');
-    rgb = hslToRgb(hsl.h, s / 100, l / 100);
+  /** Aplica a cor da imagem ao site inteiro. Mantém o padrão se falhar. */
+  function apply(img){
+    const c = read(img);
+    if (!c) return false;
+    Theme.set(c);
+    rgb = hslToRgb(c.h, c.s, c.l);
     return true;
   }
 
@@ -1516,11 +2018,158 @@ const Accent = (() => {
     return (rgb = hslToRgb(h, s / 100, l / 100));
   }
 
-  return { apply, toRgb, reset(){ rgb = null; } };
+  return { read, apply, toRgb, reset(){ rgb = null; } };
 })();
 
 /* ═══════════════════════════════════════════════════════════════
-   ③c  O GIRO — a coroa roda, o "S" fica em pé
+   ③d  A TINTA — a arte gira de matiz junto com o site
+   ───────────────────────────────────────────────────────────────
+   Aqui é onde o tema deixa de ser uma cor de interface e vira clima.
+   O logo é redesenhado pixel a pixel: cada ponto vai para HSL, ganha
+   o mesmo deslocamento de matiz que separa a cor da arte da cor
+   escolhida, e volta. Como o giro é o MESMO para todo mundo, as
+   diferenças internas do desenho sobrevivem — o degradê do miolo
+   para a borda, o brilho da ponta do raio, a sombra do "S". O sol
+   continua sendo um sol; só que verde, roxo, gelo.
+
+   A luz não é somada, é elevada: l' = l^γ, com γ escolhido para levar
+   exatamente a luminosidade da arte à da cor nova. Uma multiplicação
+   estouraria os claros e uma soma lavaria os escuros; a potência move
+   os meios-tons e deixa o preto preto e o branco branco, que é como
+   um bom ajuste de exposição se comporta.
+
+   Se o navegador não deixar ler os pixels — página aberta direto do
+   disco, em file://, o canvas fica contaminado —, o giro aproximado
+   do CSS assume e ninguém fica sem cor. É mais grosseiro num logo de
+   muitas cores; num de cor sólida, quase ninguém distingue.
+   ═══════════════════════════════════════════════════════════════ */
+const Tint = (() => {
+  const cache = new Map();     // src original → versão tingida, em data URL
+  const done  = new WeakSet(); // imagens já resolvidas (o swap dispara load de novo)
+  let dh = 0, ks = 1, gam = 1, live = false;
+
+  /** Redesenha um bloco RGBA no lugar. */
+  function shift(px){
+    // A luz depende só de (max+min), então 511 entradas cobrem todos os
+    // casos possíveis e a potência sai do laço quente de uma vez.
+    const LUT = new Float32Array(511);
+    for (let i = 0; i < 511; i++) LUT[i] = (i / 510) ** gam;
+
+    const chan = (p, q, t) => {
+      t = (t + 1) % 1;
+      if (t < 1/6) return (p + (q - p) * 6 * t) * 255;
+      if (t < 1/2) return q * 255;
+      if (t < 2/3) return (p + (q - p) * (2/3 - t) * 6) * 255;
+      return p * 255;
+    };
+
+    for (let i = 0; i < px.length; i += 4){
+      if (!px[i + 3]) continue;                       // transparente: nada a fazer
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      const max = r > g ? (r > b ? r : b) : (g > b ? g : b);
+      const min = r < g ? (r < b ? r : b) : (g < b ? g : b);
+      const L = LUT[max + min];
+
+      if (max === min){                                // cinza puro: só a luz muda
+        px[i] = px[i + 1] = px[i + 2] = L * 255 + .5 | 0;
+        continue;
+      }
+
+      const sum = (max + min) / 255;
+      const d   = (max - min) / 255;
+      const s   = Math.min(1, (sum > 1 ? d / (2 - sum) : d / sum) * ks);
+
+      let h;
+      const dd = max - min;
+      if (max === r)      h = (g - b) / dd + (g < b ? 6 : 0);
+      else if (max === g) h = (b - r) / dd + 2;
+      else                h = (r - g) / dd + 4;
+      h = ((h * 60 + dh) % 360 + 360) % 360 / 360;
+
+      const q = L < .5 ? L * (1 + s) : L + s - L * s;
+      const p = 2 * L - q;
+      px[i]     = chan(p, q, h + 1/3) + .5 | 0;
+      px[i + 1] = chan(p, q, h)       + .5 | 0;
+      px[i + 2] = chan(p, q, h - 1/3) + .5 | 0;
+    }
+  }
+
+  /** Troca os pixels de uma imagem pelos tingidos, sem piscar. */
+  async function repaint(img){
+    if (done.has(img) || !img.naturalWidth) return;
+    done.add(img);
+    const key = img.currentSrc || img.src;
+    if (/^data:/.test(key)) return;                   // já é resultado nosso
+
+    let url = cache.get(key);
+    if (!url){
+      const cv = document.createElement('canvas');
+      cv.width  = img.naturalWidth;
+      cv.height = img.naturalHeight;
+      const cx = cv.getContext('2d', { willReadFrequently:true });
+      cx.drawImage(img, 0, 0);
+      const data = cx.getImageData(0, 0, cv.width, cv.height);   // lança se bloqueado
+      shift(data.data);
+      cx.putImageData(data, 0, 0);
+      url = cv.toDataURL('image/png');
+      cache.set(key, url);
+    }
+
+    // a troca só acontece com a nova versão já decodificada — assim o
+    // filtro do CSS sai e os pixels certos entram no mesmo quadro
+    const next = new Image();
+    next.src = url;
+    if (next.decode) { try { await next.decode(); } catch { /* segue */ } }
+    img.src = url;
+    img.classList.remove('is-raw');
+  }
+
+  function watch(img){
+    if (img.closest('.avatar.is-circle')) return;     // foto de gente não vira azul
+    img.classList.add('is-raw');
+    const go = () => repaint(img).catch(() => { /* canvas bloqueado: fica o filtro */ });
+    img.addEventListener('load', go);
+    if (img.complete) go();
+  }
+
+  /**
+   * Mede a distância entre a cor da arte e a cor do site e, se houver
+   * distância, sai tingindo. Recebe o {h,s,l} que o tema de fato aplicou
+   * (o já corrigido para caber na faixa legível): assim marca e interface
+   * terminam exatamente na mesma cor.
+   */
+  function init(target){
+    if (!target) return;
+    const base = Theme.parse(CONFIG.artColor);
+    if (!base) return;
+
+    const bl = Math.min(.98, Math.max(.02, base.l));
+    const tl = Math.min(.98, Math.max(.02, target.l));
+
+    dh  = target.h - base.h;
+    ks  = base.s > .04 ? Math.min(4, target.s / base.s) : 1;
+    gam = Math.log(tl) / Math.log(bl);
+
+    // mesma cor, nada a fazer — o caso do tema de fábrica, custo zero
+    if (Math.abs(dh) < .5 && Math.abs(ks - 1) < .01 && Math.abs(gam - 1) < .01) return;
+    live = true;
+
+    // o giro aproximado do CSS entra já, antes de qualquer pixel ser lido:
+    // é ele que segura a cor enquanto o recorte exato não chega, e é ele
+    // que fica de vez se o navegador não liberar a leitura do canvas
+    document.documentElement.style.setProperty(
+      '--tint',
+      `hue-rotate(${dh.toFixed(1)}deg) saturate(${ks.toFixed(3)}) brightness(${(tl / bl).toFixed(3)})`
+    );
+
+    document.querySelectorAll('img[data-tint]').forEach(watch);
+  }
+
+  return { init, get live(){ return live; } };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   ③e  O GIRO — a coroa roda, o "S" fica em pé
    ───────────────────────────────────────────────────────────────
    As duas imagens da marca são recortadas no mesmo quadrado, centradas
    no mesmo eixo (o do disco). Girando só a de baixo, o miolo continua
@@ -1770,17 +2419,102 @@ const Waves = (() => {
 })();
 
 /* ═══════════════════════════════════════════════════════════════
-   ⑤  SHEET DO QR CODE
+   ⑤  AS FOLHAS — a mecânica que sobe por cima de tudo
+   ───────────────────────────────────────────────────────────────
+   Duas folhas usam esta mesma mecânica (o QR e o álbum), e vale a
+   pena ela morar num lugar só: abrir, fechar, travar a rolagem,
+   parar o que anima atrás do desfoque, prender o foco do teclado
+   dentro do que está aberto e devolvê-lo a quem chamou. É a parte
+   que ninguém vê e que, quando falta, o leitor de tela denuncia.
+
+   Uma folha por vez: abrir a segunda fecha a primeira.
+   ═══════════════════════════════════════════════════════════════ */
+const Panel = (() => {
+  let live = null;
+
+  /** '.58s' e '580ms' viram 580. */
+  const ms = (value) => {
+    const n = parseFloat(value);
+    if (!isFinite(n)) return 0;
+    return /ms\s*$/.test(value) ? n : n * 1000;
+  };
+  // o tempo da saída mora no CSS (--sheet-out), junto com a animação que
+  // ele mede — assim os dois não têm como discordar num refactor futuro
+  const OUT = ms(getComputedStyle(document.documentElement)
+                   .getPropertyValue('--sheet-out')) || 580;
+
+  function create(sel, { onOpen } = {}){
+    const el = $(sel);
+    let restoreFocus = null, closeTimer;
+
+    /* o que dá para alcançar com Tab lá dentro, em ordem de tela */
+    const reachable = () => [...el.querySelectorAll('a[href], button:not([disabled])')]
+      .filter((n) => !n.hidden && n.offsetParent !== null);
+
+    function open(){
+      if (live && live !== api) live.hide();
+      if (onOpen) onOpen();
+      clearTimeout(closeTimer);
+      restoreFocus = document.activeElement;
+      el.hidden = false;
+      void el.offsetHeight;                 // força o reflow antes de animar
+      // reabriu no meio da saída? a folha volta de onde estiver, sem salto
+      el.classList.remove('is-closing');
+      el.classList.add('is-open');
+      document.body.classList.add('is-locked');
+      Waves.stop();                         // nada anima atrás do blur
+      Spin.hold();
+      live = api;
+      // o foco começa no botão de fechar (o último da folha): é a saída,
+      // e nenhum toque de teclado leva embora sem querer
+      const keys = reachable();
+      if (keys.length) keys[keys.length - 1].focus({ preventScroll:true });
+    }
+
+    function hide(){
+      if (!el.classList.contains('is-open')) return;
+      el.classList.remove('is-open');
+      el.classList.add('is-closing');
+      document.body.classList.remove('is-locked');
+      Spin.release();
+      if (!document.hidden) Waves.start();   // já andando quando o véu levanta
+      closeTimer = setTimeout(() => {
+        el.classList.remove('is-closing');
+        el.hidden = true;
+      }, OUT);
+      if (restoreFocus && restoreFocus.focus) restoreFocus.focus({ preventScroll:true });
+      if (live === api) live = null;
+    }
+
+    el.querySelectorAll('[data-close]').forEach((n) => n.addEventListener('click', hide));
+
+    const api = { open, hide, reachable, get isOpen(){ return live === api; } };
+    return api;
+  }
+
+  addEventListener('keydown', (e) => {
+    if (!live) return;
+    if (e.key === 'Escape'){ e.preventDefault(); live.hide(); return; }
+    if (e.key !== 'Tab') return;
+    const keys = live.reachable();
+    if (!keys.length) return;
+    e.preventDefault();                                    // foco preso na folha
+    const i = keys.indexOf(document.activeElement);
+    keys[(i + (e.shiftKey ? -1 : 1) + keys.length) % keys.length].focus({ preventScroll:true });
+  });
+
+  return { create };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑤b  A FOLHA DO QR CODE
    ═══════════════════════════════════════════════════════════════ */
 const Sheet = (() => {
-  const sheet = $('#sheet');
   const card  = $('#qrCode');
   const mark  = document.querySelector('.qr-mark');
   const urlEl = $('#qrUrl');
-  const close = $('#closeBtn');
   let painted = '';
-  let restoreFocus = null;
-  let closeTimer;
+  let panel = null;
 
   function render(){
     const url = pageUrl();
@@ -1802,41 +2536,186 @@ const Sheet = (() => {
     urlEl.textContent = prettyUrl(url);
   }
 
-  function open(){
-    render();
-    clearTimeout(closeTimer);
-    restoreFocus = document.activeElement;
-    sheet.hidden = false;
-    void sheet.offsetHeight;              // força o reflow antes de animar
-    sheet.classList.add('is-open');
-    document.body.classList.add('is-locked');
-    Waves.stop();                         // nada anima atrás do blur
-    Spin.hold();
-    close.focus({ preventScroll:true });
+  function init(){
+    panel = Panel.create('#sheet', { onOpen:render });
+    $('#qrBtn').addEventListener('click', () => panel.open());
   }
 
-  function hide(){
-    if (!sheet.classList.contains('is-open')) return;
-    sheet.classList.remove('is-open');
-    document.body.classList.remove('is-locked');
-    Spin.release();
-    if (!document.hidden) Waves.start();
-    closeTimer = setTimeout(() => { sheet.hidden = true; }, 520);
-    if (restoreFocus && restoreFocus.focus) restoreFocus.focus({ preventScroll:true });
+  return {
+    init,
+    open(){ if (panel) panel.open(); },
+    hide(){ if (panel) panel.hide(); }
+  };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑤c  A FOLHA DO ÁLBUM — o anúncio do lançamento
+   ───────────────────────────────────────────────────────────────
+   Liga em CONFIG.album.on. Desligado, este módulo devolve na primeira
+   linha: nenhuma requisição, nenhum selo, nada no ar.
+
+   De onde vem a capa, em ordem de preferência:
+
+     1. CONFIG.album.cover, se você preencheu. Sua palavra é final.
+     2. ./assets/album-<id>.json — a cópia que o build-assets.py baixou.
+        Mesma origem, entra no cache do app, funciona offline e não
+        depende de o Spotify estar de pé. O nome do arquivo carrega o ID
+        do álbum: trocou o link e esqueceu de rodar o script, o arquivo
+        simplesmente não existe e a busca segue adiante, em vez de
+        mostrar a capa do álbum passado.
+     3. O oEmbed do Spotify, ao vivo. Só colar o link — sem chave, sem
+        conta de desenvolvedor. A resposta fica guardada no navegador:
+        a primeira visita paga a conta, as outras herdam.
+     4. Nada disso deu certo? O popup abre com o que você escreveu no
+        CONFIG e um degradê na cor do tema no lugar da capa. Feio é o
+        popup que não abre.
+   ═══════════════════════════════════════════════════════════════ */
+const Album = (() => {
+  const cfg = CONFIG.album || {};
+  let panel = null, id = '', data = null;
+
+  /* localStorage falha em modo privado e com cookies bloqueados; nesses
+     casos o popup volta a aparecer toda visita, que é o mal menor */
+  const store = {
+    get(k){ try { return JSON.parse(localStorage.getItem('sunn:' + k)); } catch { return null; } },
+    set(k, v){ try { localStorage.setItem('sunn:' + k, JSON.stringify(v)); } catch { /* ok */ } }
+  };
+
+  const spotifyId = (url) => {
+    const m = /open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:album|track|playlist|artist)\/([a-zA-Z0-9]+)/.exec(url || '');
+    return m ? m[1] : '';
+  };
+
+  /** Descobre nome e capa. O que você escreveu no CONFIG sempre vence. */
+  async function resolve(){
+    const seu = { title:cfg.title || '', cover:cfg.cover || '' };
+    // escreveu os dois? não há o que perguntar a ninguém
+    if (seu.title && seu.cover) return { ...seu, accent:'' };
+
+    const junta = (achado) => ({
+      title:  seu.title  || achado.title  || '',
+      cover:  seu.cover  || achado.cover  || '',
+      accent: seu.cover ? '' : (achado.accent || '')   // capa sua, cor sua
+    });
+
+    if (id){
+      try {
+        const r = await fetch(`./assets/album-${id}.json`, { cache:'force-cache' });
+        if (r.ok) return junta(await r.json());
+      } catch { /* sem cópia local: vai no Spotify */ }
+
+      const antes = store.get('cover:' + id);
+      if (antes && antes.cover) return junta(antes);
+    }
+
+    try {
+      const r = await fetch('https://open.spotify.com/oembed?url=' + encodeURIComponent(cfg.url), { mode:'cors' });
+      if (r.ok){
+        const j = await r.json();
+        const achado = { title:j.title || '', cover:j.thumbnail_url || '', accent:'' };
+        if (id && achado.cover) store.set('cover:' + id, achado);
+        return junta(achado);
+      }
+    } catch { /* offline, ou o Spotify fechou o CORS: segue sem capa */ }
+
+    return { ...seu, accent:'' };
+  }
+
+  /**
+   * A cor do popup sai da capa, não do site.
+   *
+   * O disco tem a cor dele, e por trinta segundos o anúncio é sobre o
+   * disco: o brilho por baixo da capa, o "novo álbum" em cima e o botão
+   * inteiro passam a falar a língua da arte. O resto da página não sente
+   * nada — a troca acontece só dentro de [data-accent].
+   *
+   * De onde vem, em ordem: o que você fixou no CONFIG · a cor que o
+   * build-assets.py já calculou e guardou no JSON · a leitura da capa
+   * aqui mesmo. Nenhuma delas deu? Fica a cor do site, que nunca é
+   * uma escolha errada.
+   */
+  function recolor(){
+    const sheet = $('#albumSheet');
+    const want = (cfg.accent || 'auto').trim();
+    if (/^(tema|site)$/i.test(want)) return;              // fica na cor do site
+
+    if (!/^auto$/i.test(want)){
+      const forced = Theme.parse(want);
+      if (forced) Theme.paint(sheet, forced);
+      return;
+    }
+
+    const ready = data && data.accent && Theme.parse(data.accent);
+    if (ready) return void Theme.paint(sheet, ready);      // veio pronta do build
+
+    if (!data || !data.cover) return;
+    // Uma segunda cópia da capa, pedida com CORS, só para ler os pixels:
+    // a que aparece na tela continua sem exigência nenhuma e nunca falha
+    // por causa disto. CDN que não libera a leitura? O popup fica na cor
+    // do site — e rodar o build-assets.py resolve de vez.
+    const probe = new Image();
+    probe.crossOrigin = 'anonymous';
+    probe.onload = () => {
+      const c = Accent.read(probe);
+      if (c) Theme.paint(sheet, c);
+    };
+    probe.onerror = () => { /* sem leitura, sem drama */ };
+    probe.src = data.cover;
+  }
+
+  function render(){
+    if (!data) return;
+    const art = $('#albumArt');
+    $('#albumTitle').textContent = data.title || cfg.title || '';
+    $('#albumSub').textContent   = cfg.sub || '';
+    art.alt = data.title ? `Capa de ${data.title}` : '';
+    if (data.cover && art.getAttribute('src') !== data.cover){
+      art.addEventListener('load', () => art.classList.add('is-on'), { once:true });
+      art.src = data.cover;
+    }
+    recolor();
+  }
+
+  function open(){
+    if (id) store.set('seen:' + id, 1);
+    $('#albumBadgeWrap').hidden = false;      // fechou o popup, fica o selo
+    panel.open();
   }
 
   function init(){
-    $('#qrBtn').addEventListener('click', open);
-    close.addEventListener('click', hide);
-    $('#scrim').addEventListener('click', hide);
-    addEventListener('keydown', (e) => {
-      if (!sheet.classList.contains('is-open')) return;
-      if (e.key === 'Escape'){ e.preventDefault(); hide(); }
-      if (e.key === 'Tab'){ e.preventDefault(); close.focus(); }   // foco preso na sheet
-    });
+    if (!cfg.on || !cfg.url) return;
+    id = spotifyId(cfg.url);
+
+    $('#albumNote').textContent    = cfg.note || '';
+    $('#albumCtaText').textContent = cfg.cta  || 'Ouvir';
+    $('#albumBadge').textContent   = cfg.badge || cfg.note || 'novo álbum';
+    $('#albumCta').href   = cfg.url;
+    $('#albumCover').href = cfg.url;
+    $('#albumTitle').textContent = cfg.title || '';
+
+    panel = Panel.create('#albumSheet');
+    $('#albumBadge').addEventListener('click', open);
+
+    // a capa é buscada já, em paralelo com a entrada da página: quando o
+    // popup sobe (quase um segundo depois) ela costuma estar pronta
+    resolve().then((d) => { data = d; render(); }).catch(() => {});
   }
 
-  return { init, open, hide };
+  /**
+   * Decide se o popup sobe sozinho.
+   *   force — veio ?album=1 na URL: abre mesmo para quem já viu
+   *   quiet — outra folha já vai abrir (o atalho ?qr=1): só o selo
+   */
+  function announce({ force, quiet } = {}){
+    if (!panel) return;
+    // quem já viu continua com o selo à mão, só não leva o popup na cara
+    $('#albumBadgeWrap').hidden = false;
+    if (quiet && !force) return;
+    if (force || cfg.once === false || !(id && store.get('seen:' + id)))
+      setTimeout(open, 900);
+  }
+
+  return { init, announce, show(){ if (panel) open(); } };
 })();
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1923,12 +2802,16 @@ function reveal(){
   document.body.classList.add('is-ready');
 }
 
+// a cor vem primeiro: é dela que o resto da página se pinta
+const theme = Theme.init();
 paint();
+Tint.init(theme);          // e a arte gira de matiz atrás
 if (CONFIG.waves){
   document.body.classList.add('has-waves');
   Waves.init();
 }
 Sheet.init();
+Album.init();
 parallax();
 rowLight();
 $('#shareBtn').addEventListener('click', share);
@@ -1940,8 +2823,10 @@ const settled = document.fonts && document.fonts.ready
 settled.then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
   reveal();
   Spin.init();          // o sol começa a girar junto com a entrada
+  const qs = new URLSearchParams(location.search);
   // atalho do app instalado: abre direto no QR Code
-  if (new URLSearchParams(location.search).has('qr')) setTimeout(Sheet.open, 520);
+  if (qs.has('qr')) setTimeout(Sheet.open, 520);
+  Album.announce({ force:qs.has('album'), quiet:qs.has('qr') });
 })));
 
 // service worker (offline)

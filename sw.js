@@ -1,6 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════
    Service worker — app shell offline
    Troque a versão sempre que publicar mudanças nos assets.
+
+   Vale para a cor: o index.html vem sempre da rede (o site em si muda de
+   cor na hora), mas ícones, og e splash ficam em cache. Trocou CONFIG.accent,
+   rodou o build-assets.py? Suba o VERSION junto, senão quem já instalou o
+   app continua com o ícone antigo na tela do celular por mais um tempo.
    ═══════════════════════════════════════════════════════════════ */
 const VERSION = 'v3';
 const SHELL   = `sunn-shell-${VERSION}`;

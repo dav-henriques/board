@@ -113,7 +113,10 @@ const DEFAULT_HUE = 22;
 async function read(){
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
   const page = await ctx.newPage();
-  await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
+  // ?accent=auto: o modo em que a cor volta a sair da imagem. Com uma cor
+  // escolhida em CONFIG.accent (o padrão hoje) é o logo que gira de matiz
+  // para acompanhar o site — o caminho inverso, testado em theme-verify.mjs.
+  await page.goto(`http://localhost:${PORT}/?accent=auto`, { waitUntil: 'load' });
   await page.waitForTimeout(1400);
   const out = await page.evaluate(() => {
     const s = getComputedStyle(document.documentElement);

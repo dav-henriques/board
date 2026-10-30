@@ -62,9 +62,10 @@ async function run(name, opts, extra){
   ready ? pass(`${name}: entrada concluída`) : note(`${name}: body.is-ready não aplicado`);
 
   // a quantidade sai do CONFIG, então o teste confere que a lista existe
-  // e que todo link tem destino — não um número fixo
-  const rows = await page.locator('.row').count();
-  const hrefs = await page.locator('.row').evaluateAll(
+  // e que todo link tem destino — não um número fixo. Os cards "em breve"
+  // (url vazia no CONFIG) ficam de fora: são vagas esperando o endereço.
+  const rows = await page.locator('.row:not(.is-pending)').count();
+  const hrefs = await page.locator('.row:not(.is-pending)').evaluateAll(
     (els) => els.filter((a) => a.getAttribute('href')).length);
   rows > 0 && hrefs === rows
     ? pass(`${name}: ${rows} links renderizados, todos com destino`)
@@ -177,7 +178,7 @@ await run('iphone', { ...devices['iPhone 14 Pro'], isMobile: true, hasTouch: tru
 
 // ── Desktop ─────────────────────────────────────────────────────
 await run('desktop', { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 }, async (page, name) => {
-  await page.locator('.row').first().hover();
+  await page.locator('a.row').first().hover();
   await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(SHOTS, `${name}-hover.png`) });
 

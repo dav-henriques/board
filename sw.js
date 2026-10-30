@@ -7,7 +7,7 @@
    rodou o build-assets.py? Suba o VERSION junto, senão quem já instalou o
    app continua com o ícone antigo na tela do celular por mais um tempo.
    ═══════════════════════════════════════════════════════════════ */
-const VERSION = 'v3';
+const VERSION = 'v11';
 const SHELL   = `sunn-shell-${VERSION}`;
 const RUNTIME = `sunn-runtime-${VERSION}`;
 
@@ -18,14 +18,17 @@ const PRECACHE = [
   './assets/mark.png',
   './assets/mark-sun.png',
   './assets/mark-core.png',
+  './assets/ness-photo.jpg',
   './assets/avatar.jpg',
-  './assets/og.png',
-  './icons/favicon.svg',
-  './icons/favicon-32.png',
-  './icons/apple-touch-icon.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png'
+  './assets/ness-og.jpg',
+  './icons/ness-favicon-64.png',
+  './icons/ness-favicon-48.png',
+  './icons/ness-favicon-32.png',
+  './icons/ness-favicon-16.png',
+  './icons/ness-apple-touch-icon.png',
+  './icons/ness-icon-192.png',
+  './icons/ness-icon-512.png',
+  './icons/ness-icon-maskable-512.png'
 ];
 
 self.addEventListener('install', (event) => {

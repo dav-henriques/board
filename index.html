@@ -1876,6 +1876,20 @@
       <path d="M7.2 15.3 11.8 8.7h5.1l-4.6 6.6z" />
     </symbol>
 
+    <symbol id="i-licenses" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6.2 3.3h7.3l4.3 4.3v13.1H6.2z" />
+      <path d="M13.5 3.3v4.3h4.3" />
+      <path d="m8.9 14.2 1.8 1.8 4.4-4.4" />
+    </symbol>
+
+    <symbol id="i-untitled" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+      stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8.7" />
+      <circle cx="12" cy="12" r="2.2" />
+      <path d="m5.85 5.85 4.6 4.6M18.15 18.15l-4.6-4.6" />
+    </symbol>
+
     <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
       stroke-linejoin="round">
       <path d="M10.4 13.6a3.6 3.6 0 0 0 5.4.4l2.4-2.4a3.6 3.6 0 1 0-5.1-5.1l-1.4 1.4" />
@@ -2294,7 +2308,7 @@
         bio: 'producer & artist',       // opcional — deixe vazio para não aparecer
         eyebrow: '',                        // opcional: linha pequena com o pip, embaixo da bio
         showName: false,                     // true = o nome "ness" embaixo da foto · false = só a foto
-                                             // (escondido, o nome segue lá para leitor de tela e busca)
+        // (escondido, o nome segue lá para leitor de tela e busca)
         // A foto de perfil do NESS, inteira, num círculo acima do nome.
         // Vazio = sem foto, só o nome.
         nessLogo: './assets/ness-photo.jpg',
@@ -2352,7 +2366,8 @@
                           ·  'tema' = fica na cor do site, sem invenção        */
 
         // ícones disponíveis: spotify · applemusic · youtube · instagram
-        //                     tiktok · soundcloud · bandcamp · link · mail
+        //                     tiktok · soundcloud · bandcamp · licenses · untitled
+        //                     link · mail
 
         // NESS — os links principais. Ainda faltam os endereços: com url:''
         // o card aparece apagado, escrito "em breve", sem clique. Colou o
@@ -2360,13 +2375,16 @@
         links: [
 
           // { icon:'applemusic', label:'Apple Music',  note:'Discografia completa',  url:'https://music.apple.com/' },
-
+          { icon: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/@nesshated' },   // ← link do NESS no YouTube
           { icon: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/nesshated/' },   // ← link do NESS no Instagram
           { icon: 'tiktok', label: 'TikTok', url: 'https://www.tiktok.com/@nesshated' },   // ← link do NESS no TikTok
+          { icon: 'untitled', label: 'Untitled/Catalog', url: 'https://untitled.stream/u/nesshated' },   // ← link do NESS no TikTok
+          { icon: 'licenses', label: 'Licenses', url: 'https://nesshated.github.io/licenses/' },   // ← link do NESS no TikTok
+
           // { icon:'soundcloud', label:'SoundCloud',   note:'Demos e edits',         url:'https://soundcloud.com/' },
           // { icon:'bandcamp',   label:'Bandcamp',     note:'Comprar em alta qualidade', url:'https://bandcamp.com/' }
           { icon: 'spotify', label: 'Spotify', url: '' },   // ← link do NESS no Spotify
-          { icon: 'youtube', label: 'YouTube', url: '' },   // ← link do NESS no YouTube
+
         ],
 
         // SUNN — o projeto instrumental, numa seção menor embaixo do NESS,
